@@ -4,6 +4,7 @@ import {
   PrintDocumentInputSchema,
   PrintUrlInputSchema,
   ConvertToPdfInputSchema,
+  ValidatePrintOptionsInputSchema,
   ListPrintersInputSchema,
   GetPrinterStatusInputSchema,
   GetPrinterCapabilitiesInputSchema,
@@ -14,6 +15,7 @@ import {
   type PrintDocumentInput,
   type PrintUrlInput,
   type ConvertToPdfInput,
+  type ValidatePrintOptionsInput,
   type GetPrinterStatusInput,
   type GetPrinterCapabilitiesInput,
   type GetPrintJobsInput,
@@ -100,17 +102,17 @@ export function registerPrinterTools(server: McpServer): void {
     "print_document",
     {
       title: "Print document",
-      description: `Print a document to the network printer. Supports PDF, images, text (direct), and Office files (DOCX/XLSX/PPTX - auto-converted to PDF via Mac).
+      description: `Print a document to Kyocera TASKalfa 6054ci (DF-7150 finisher installed).
 
-WORKFLOW:
-  1. Call get_printer_capabilities to discover options (staple, punch, tray, etc.)
-  2. Call print_document with the file and options
-  3. Call get_job_status to track progress
+SUPPORTED FILES: PDF, images (JPG/PNG/TIFF), text → direct print. Office files (DOCX/XLSX/PPTX) → auto-converted to PDF via Graph API.
 
-For Office files, the Mac conversion server must be configured (MAC_HOST, MAC_USER env vars).
-The conversion uses Microsoft Office for Mac for 100% layout fidelity.
+WORKFLOW for finisher options:
+  1. Build cups_options from the reference in the parameter description
+  2. Call validate_print_options to verify the options are valid
+  3. Call print_document with the verified options
+  4. Call get_job_status to confirm completion
 
-cups_options dict supports ALL Kyocera finisher options. Run get_printer_capabilities first.`,
+cups_options parameter contains full hardware reference with all valid values and common combinations.`,
       inputSchema: PrintDocumentInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -332,6 +334,74 @@ Use filter to narrow: 'staple', 'punch', 'fold', 'tray', 'media', 'booklet', 'in
         directPrint: { description: "Sent directly to CUPS (no conversion)", formats: formats.direct },
         macOfficeConvert: { description: "Converted to PDF via Mac Office (100% fidelity)", formats: formats.macOffice, status: macStatus },
       });
+    }
+  );
+
+  // ═══ 11. validate_print_options ═══════════════════════════
+
+  server.registerTool(
+    "validate_print_options",
+    {
+      title: "Validate print options",
+      description: `Check if a set of cups_options is valid BEFORE sending to print.
+Returns which options are valid, invalid, and any compatibility warnings.
+ALWAYS call this before print_document when using finisher options (staple, punch, fold, booklet).
+
+Example: validate_print_options(cups_options: {"Stpl":"Front","Pnch":"2Hole","PageSize":"A4"})`,
+      inputSchema: ValidatePrintOptionsInputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async (params: ValidatePrintOptionsInput) => {
+      try {
+        const printer = params.printer || "TASKalfa-6054ci";
+        const caps = await cups.getPrinterCapabilities(printer);
+
+        // Build lookup: optionName → Set of valid values
+        const validOptions = new Map<string, Set<string>>();
+        for (const cap of caps) {
+          validOptions.set(cap.option, new Set(cap.choices));
+        }
+
+        const results: { option: string; value: string; valid: boolean; reason: string }[] = [];
+        const warnings: string[] = [];
+
+        for (const [key, value] of Object.entries(params.cups_options)) {
+          const validValues = validOptions.get(key);
+          if (!validValues) {
+            results.push({ option: key, value, valid: false, reason: `Unknown option "${key}". Use get_printer_capabilities to see all options.` });
+          } else if (!validValues.has(value)) {
+            results.push({ option: key, value, valid: false, reason: `Invalid value "${value}". Valid: ${[...validValues].join(", ")}` });
+          } else {
+            results.push({ option: key, value, valid: true, reason: "OK" });
+          }
+        }
+
+        // Compatibility checks
+        const opts = params.cups_options;
+        if (opts.KCBooklet && opts.KCBooklet !== "None" && opts.Stpl && opts.Stpl !== "Center" && opts.Stpl !== "None") {
+          warnings.push("Booklet mode typically requires Stpl=Center (saddle-stitch) or Stpl=None.");
+        }
+        if (opts.Fold === "True" && (!opts.KCBooklet || opts.KCBooklet === "None")) {
+          warnings.push("Fold=True is for booklet folding. Set KCBooklet=Left or Right, or use FldA for standalone folding.");
+        }
+        if (opts.FldA && opts.FldA !== "None" && (!opts.OutputBin || opts.OutputBin !== "FLDTRAY")) {
+          warnings.push("When using FldA (folding mode), set OutputBin=FLDTRAY to route output to the fold tray.");
+        }
+        if (opts.Stpl && opts.Stpl !== "None" && (!opts.Scnt || opts.Scnt === "None")) {
+          warnings.push("Stpl is set but Scnt (staple method) is not. Add Scnt=All to staple the whole job, or Scnt=EachN for N-page sets.");
+        }
+
+        const allValid = results.every(r => r.valid);
+        return ok({
+          valid: allValid && warnings.length === 0,
+          allOptionsRecognized: allValid,
+          results,
+          warnings,
+          summary: allValid
+            ? (warnings.length > 0 ? `All options valid but ${warnings.length} warning(s).` : "All options valid. Safe to print.")
+            : `${results.filter(r => !r.valid).length} invalid option(s) found.`,
+        });
+      } catch (e) { return err(`Error: ${(e as Error).message}`); }
     }
   );
 }
