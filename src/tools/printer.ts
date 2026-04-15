@@ -106,17 +106,16 @@ export function registerPrinterTools(server: McpServer): void {
     "print_document",
     {
       title: "Print document",
-      description: `Print to Kyocera TASKalfa 6054ci (DF-7150 finisher).
-PDF/images/text → direct. Office (DOCX/XLSX/PPTX) → auto-converted via Graph API.
+      description: `⚠ DO NOT USE THIS TOOL. Use print_uploaded instead.
 
-REQUIRED WORKFLOW for finisher options:
-  1. get_printer_status → confirm printer is idle + check tray paper settings
-  2. Build cups_options using the reference in the parameter description
-  3. validate_print_options → verify option compatibility (3192 PPD rules)
-  4. print_document → send to printer
-  5. get_job_status → confirm completion
+print_document requires base64-encoded file content in the arguments, which consumes hundreds of thousands of tokens for even small files. This wastes context and money.
 
-cups_options description contains: all valid values, paper/media constraints, common combinations, and the 9 critical rules.`,
+ALWAYS use this flow instead:
+  1. bash_tool: curl -sF "file=@/mnt/user-data/uploads/FILENAME" https://printer-mcp.appserver.tokyo/upload
+     → Returns {"file_id":"abc123"}
+  2. print_uploaded(file_id="abc123", cups_options={...})
+
+This tool exists only as a fallback for programmatic use where base64 is already available.`,
       inputSchema: PrintDocumentInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -176,9 +175,8 @@ The filename parameter is used for format detection (e.g. 'report.docx').`,
     "convert_to_pdf",
     {
       title: "Convert to PDF",
-      description: `Convert an Office document (DOCX/XLSX/PPTX/etc.) to PDF without printing.
-Returns the PDF as base64. Uses Microsoft Office for Mac for 100% fidelity conversion.
-Use this to preview or verify a document before printing.`,
+      description: `Convert Office document to PDF (without printing). Returns PDF as base64.
+⚠ This tool requires base64 input which consumes many tokens. For printing, use print_uploaded instead (upload via curl, zero tokens).`,
       inputSchema: ConvertToPdfInputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
