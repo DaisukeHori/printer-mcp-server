@@ -65,7 +65,7 @@ a{color:var(--cy);text-decoration:none}a:hover{color:#22d3ee}code{font-family:va
 
 <nav class="nav"><div class="nav__i">
   <span class="nav__b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="6" y1="7" x2="18" y2="7"/><line x1="6" y1="15" x2="18" y2="15"/><rect x="10" y="17" width="4" height="2" rx=".5" fill="currentColor"/></svg>printer-mcp</span>
-  <ul class="nav__l"><li><a href="#formats">70形式</a></li><li><a href="#staple">ステープル</a></li><li><a href="#booklet">中綴じ</a></li><li><a href="#tools">ツール</a></li><li><a href="#ref">リファレンス</a></li><li><a href="https://github.com/DaisukeHori/printer-mcp-server" target="_blank">GitHub</a></li></ul>
+  <ul class="nav__l"><li><a href="#formats">70形式</a></li><li><a href="#staple">ステープル</a></li><li><a href="#booklet">中綴じ</a></li><li><a href="#tools">ツール</a></li><li><a href="#deploy">デプロイ</a></li><li><a href="#ref">リファレンス</a></li><li><a href="https://github.com/DaisukeHori/printer-mcp-server" target="_blank">GitHub</a></li></ul>
   <span class="dot">Operational</span>
 </div></nav>
 
@@ -164,6 +164,25 @@ curl -sF <span class="v">"file=@photo.heic"</span> <span class="k">https://your-
     <div class="flow__s"><div class="flow__n">④</div>print_uploaded<br><small style="color:var(--tx3)">変換+印刷</small></div>
     <div class="flow__s"><div class="flow__n">⑤</div>get_job_status<br><small style="color:var(--tx3)">完了確認</small></div>
   </div>
+</div></section>
+
+<!-- Deploy -->
+<section class="s--a s" id="deploy"><div class="w">
+  <h2 class="s__t">🚀 デプロイ手順（10ステップ）</h2>
+  <p class="s__d">Ubuntu 24.04 + CUPS + Kyoceraドライバ + Cloudflare Tunnel。READMEにコマンド全文の完全ガイドがあります。</p>
+  <div class="steps">
+    <div class="step"><div class="step__h">Linuxサーバーを用意</div><div class="step__p">Proxmox LXC / VPS / ベアメタル。Ubuntu 24.04推奨。2コア/4GB RAM以上。</div></div>
+    <div class="step"><div class="step__h">基本ソフトをインストール</div><div class="step__p"><code>apt install cups ghostscript nodejs git imagemagick libheif-examples dcraw pandoc wkhtmltopdf</code> + <code>pip3 install ezdxf matplotlib</code></div></div>
+    <div class="step"><div class="step__h">Kyoceraドライバをインストール</div><div class="step__p">公式サイトからLinux UPD v10.0をDL → <code>dpkg -i kyodialog_10.0-0_amd64.deb</code>。PPDが445個入る。</div></div>
+    <div class="step"><div class="step__h">CUPSにプリンターを登録</div><div class="step__p"><code>lpadmin -p TASKalfa-6054ci -E -v 'socket://プリンターIP:9100' -P /usr/share/ppd/kyocera/機種名.ppd</code> + フィニッシャーオプション設定。テスト印刷で確認。</div></div>
+    <div class="step"><div class="step__h">PPDをカスタマイズ（ステープル追加）</div><div class="step__p"><a href="https://dam.kyoceradocumentsolutions.com/content/dam/gdam_dc/dc_global/document/manual/common/PrescribeCom_KD_EN_202301.pdf">PRESCRIBE仕様書</a>に基づき、DualLeft/TopRight/DualRight/DualTopのStaplePosition値をPPDに追記。READMEにsedコマンドの全文あり。</div></div>
+    <div class="step"><div class="step__h">MCPサーバーをデプロイ</div><div class="step__p"><code>cd /opt && git clone ...printer-mcp-server.git && npm install && npm run build</code></div></div>
+    <div class="step"><div class="step__h">systemdサービスを作成</div><div class="step__p"><code>/etc/systemd/system/printer-mcp.service</code> を作成。MCP_API_KEY（認証キー）と、Office変換用のGRAPH_*環境変数を設定。<code>systemctl enable --now printer-mcp</code></div></div>
+    <div class="step"><div class="step__h">Cloudflare Tunnelで公開</div><div class="step__p"><code>cloudflared service install &lt;TOKEN&gt;</code>。ダッシュボードでPublic Hostname → <code>localhost:3000</code> を設定。ポート開放不要、HTTPS自動。</div></div>
+    <div class="step"><div class="step__h">Claude.aiに接続</div><div class="step__p">Settings → MCP → Add → URL: <code>https://your-domain/mcp?key=YOUR_KEY</code></div></div>
+    <div class="step"><div class="step__h">動作テスト</div><div class="step__p">「このファイルをA4両面で左2箇所ステープルで印刷して」→ AIがアップロード→検証→印刷→完了確認を自動実行。</div></div>
+  </div>
+  <p style="color:var(--tx3);font-size:.82rem;margin-top:1rem">📖 <a href="https://github.com/DaisukeHori/printer-mcp-server#デプロイ手順完全ガイド">README</a> にコピペで使える全コマンドが書かれています。</p>
 </div></section>
 
 <!-- Reference -->
