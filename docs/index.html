@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>printer-mcp-server — AIに「印刷して」と言うだけ</title>
-<meta name="description" content="Kyocera TASKalfa 6054ciをMCP化。11ツール、ゼロトークン印刷、7種ステープル、中綴じ製本、3192件PPD制約バリデーション。">
+<meta name="description" content="Kyocera TASKalfa 6054ciをMCP化。70形式対応、11ツール、ゼロトークン印刷、7種ステープル、中綴じ製本、3192件PPD制約バリデーション。">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -26,7 +26,7 @@ a{color:var(--cy);text-decoration:none}a:hover{color:#22d3ee}code{font-family:va
 .s__d{color:var(--tx2);font-size:.9rem;margin-bottom:2.5rem;max-width:680px}
 .hero{padding:5.5rem 1.5rem 4rem;text-align:center;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(6,182,212,.1),transparent);pointer-events:none}
-.hero__chip{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--cy);background:var(--cy-g);border:1px solid rgba(6,182,212,.18);padding:.35rem .9rem;border-radius:20px;margin-bottom:1.5rem;font-family:var(--mono)}
+.hero__chip{display:inline-flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--cy);background:var(--cy-g);border:1px solid rgba(6,182,212,.18);padding:.35rem .9rem;border-radius:20px;margin-bottom:1.5rem;font-family:var(--mono)}
 .hero h1{font-size:clamp(2.2rem,5.5vw,3.8rem);font-weight:900;line-height:1.15;margin-bottom:1.2rem}
 .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--cy),var(--bl));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .hero__p{font-size:1rem;color:var(--tx2);max-width:700px;margin:0 auto 2.2rem;line-height:1.85}
@@ -41,32 +41,22 @@ a{color:var(--cy);text-decoration:none}a:hover{color:#22d3ee}code{font-family:va
 .g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem}
 .c{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.4rem;transition:border-color .3s,transform .3s}
 .c:hover{border-color:rgba(6,182,212,.25);transform:translateY(-2px)}
-.c__i{font-size:1.4rem;margin-bottom:.7rem}
 .c__h{font-weight:700;font-size:.95rem;margin-bottom:.4rem}
 .c__p{color:var(--tx2);font-size:.82rem;line-height:1.7}
 .c__tag{display:inline-block;font-size:.65rem;padding:.1rem .4rem;border-radius:3px;font-family:var(--mono);margin-top:.5rem}
-.c__tag--y{background:rgba(234,179,8,.12);color:var(--yl)}
-.c__tag--c{background:rgba(6,182,212,.12);color:var(--cy)}
 .c__tag--g{background:rgba(34,197,94,.12);color:var(--gn)}
+.c__tag--c{background:rgba(6,182,212,.12);color:var(--cy)}
+.c__tag--y{background:rgba(234,179,8,.12);color:var(--yl)}
 .pre{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.1rem 1.3rem;font-family:var(--mono);font-size:.78rem;line-height:1.9;overflow-x:auto;color:var(--tx2);margin:1rem 0}
 .pre .c_{color:var(--tx3)}.pre .k{color:var(--cy)}.pre .v{color:var(--yl)}.pre .g_{color:var(--gn)}
 .tbl{width:100%;border-collapse:collapse;font-size:.82rem}
 .tbl th{text-align:left;padding:.55rem .7rem;color:var(--tx3);font-weight:500;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,.1)}
 .tbl td{padding:.55rem .7rem;border-bottom:1px solid var(--bd)}
-.tbl tr:hover td{background:rgba(255,255,255,.015)}
 .tag{font-size:.6rem;padding:.12rem .35rem;border-radius:3px;font-family:var(--mono);font-weight:600}
 .tag-w{background:rgba(59,130,246,.15);color:var(--bl)}.tag-r{background:rgba(34,197,94,.15);color:var(--gn)}.tag-d{background:rgba(239,68,68,.15);color:var(--rd)}
-.cst{background:var(--sf);border-radius:var(--r);padding:1rem 1.2rem;margin:.6rem 0;border-left:3px solid var(--rd);font-size:.82rem}
-.cst--ok{border-left-color:var(--gn)}
-.cst__h{font-weight:700;margin-bottom:.2rem}
-.cst__m{color:var(--tx2)}
 .flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.4rem;text-align:center;margin:2rem 0}
 .flow__s{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:.8rem .4rem;font-size:.72rem}
 .flow__n{font-family:var(--mono);font-weight:700;color:var(--cy);font-size:1rem;margin-bottom:.2rem}
-.steps{counter-reset:step}.step{counter-increment:step;position:relative;padding-left:3.5rem;margin-bottom:2rem}
-.step::before{content:counter(step);position:absolute;left:0;top:0;width:2.2rem;height:2.2rem;background:var(--sf2);border:1px solid rgba(255,255,255,.1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.85rem;color:var(--cy)}
-.step__h{font-weight:700;font-size:1rem;margin-bottom:.3rem}
-.step__p{color:var(--tx2);font-size:.85rem;line-height:1.8}
 .footer{text-align:center;padding:3rem 1.5rem;color:var(--tx3);font-size:.78rem;border-top:1px solid var(--bd)}
 @media(max-width:768px){.nav__l{display:none}.stats{grid-template-columns:repeat(2,1fr)}.g2,.g3,.g4{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,1fr)}}
 </style>
@@ -75,89 +65,86 @@ a{color:var(--cy);text-decoration:none}a:hover{color:#22d3ee}code{font-family:va
 
 <nav class="nav"><div class="nav__i">
   <span class="nav__b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="6" y1="7" x2="18" y2="7"/><line x1="6" y1="15" x2="18" y2="15"/><rect x="10" y="17" width="4" height="2" rx=".5" fill="currentColor"/></svg>printer-mcp</span>
-  <ul class="nav__l"><li><a href="#zero">ゼロトークン</a></li><li><a href="#staple">ステープル</a></li><li><a href="#booklet">中綴じ</a></li><li><a href="#tools">ツール</a></li><li><a href="#setup">セットアップ</a></li><li><a href="https://github.com/DaisukeHori/printer-mcp-server" target="_blank">GitHub</a></li></ul>
+  <ul class="nav__l"><li><a href="#formats">70形式</a></li><li><a href="#staple">ステープル</a></li><li><a href="#booklet">中綴じ</a></li><li><a href="#tools">ツール</a></li><li><a href="#ref">リファレンス</a></li><li><a href="https://github.com/DaisukeHori/printer-mcp-server" target="_blank">GitHub</a></li></ul>
   <span class="dot">Operational</span>
 </div></nav>
 
 <section class="hero">
-  <div class="hero__chip">🖨 11 Tools · Zero-Token · 7 Staple Modes · Landscape Booklet · 3,192 PPD Rules</div>
+  <div class="hero__chip">🖨 11 Tools · 70 Formats · 7 Staple Modes · Zero-Token · 3,192 PPD Rules</div>
   <h1>AIに<em>「印刷して」</em><br>と言うだけ</h1>
-  <p class="hero__p">ファイルをアップロードして印刷指示を出すだけ。7種類のステープル、中綴じ製本（タテ・ヨコ）、折り、面付け、パンチをAIが自動制御。3,192件のPPD制約ルールで事前バリデーション。</p>
+  <p class="hero__p">HEIC写真もPhotoshopもAutoCAD(DXF)もMarkdownもOffice文書も、何でも同じ操作で印刷。7種類のステープル、中綴じ製本（タテ・ヨコ）、折り、面付け、パンチをAIが自動制御。</p>
   <div class="hero__ep">Endpoint: <b>https://printer-mcp.appserver.tokyo/mcp</b></div>
 </section>
 
 <section style="padding:0 1.5rem 3rem"><div class="w">
   <div class="stats">
+    <div class="stat"><div class="stat__n">70</div><div class="stat__l">対応ファイル形式</div></div>
     <div class="stat"><div class="stat__n">11</div><div class="stat__l">MCPツール</div></div>
     <div class="stat"><div class="stat__n">7</div><div class="stat__l">ステープル種類</div></div>
     <div class="stat"><div class="stat__n">3,192</div><div class="stat__l">PPD制約ルール</div></div>
-    <div class="stat"><div class="stat__n">0</div><div class="stat__l">ファイル転送トークン</div></div>
+  </div>
+</div></section>
+
+<!-- Formats -->
+<section class="s--a s" id="formats"><div class="w">
+  <h2 class="s__t">📁 70種類のファイル形式</h2>
+  <p class="s__d">ファイルをアップロードするだけ。AIは形式を意識する必要なし。LXC内で自動判定・変換・印刷。</p>
+  <div class="g2">
+    <div class="c"><div class="c__h">直接印刷 (12)</div><div class="c__p">PDF, PS, EPS, TXT, JPEG, PNG, TIFF, GIF, BMP — そのままCUPSへ</div></div>
+    <div class="c" style="border-color:rgba(6,182,212,.3)"><div class="c__h">画像変換 (34)</div><div class="c__p"><strong>HEIC/HEIF</strong> (iPhone), <strong>PSD/PSB</strong> (Photoshop), <strong>AI</strong> (Illustrator), XCF (GIMP), AVIF, WEBP, SVG, TGA, ICO, PCX + <strong>カメラRAW 22種</strong> (DNG, CR2, CR3, NEF, ARW, ORF, RAF, RW2, PEF 等)</div><div class="c__tag c__tag--c">ImageMagick + libheif + dcraw</div></div>
+    <div class="c"><div class="c__h">ドキュメント変換 (5)</div><div class="c__p"><strong>Markdown</strong> (.md), <strong>HTML</strong>, <strong>DXF</strong> (AutoCAD 2D図面)</div><div class="c__tag c__tag--y">pandoc + wkhtmltopdf + ezdxf</div></div>
+    <div class="c"><div class="c__h">Office変換 (19)</div><div class="c__p">DOCX, XLSX, PPTX, DOC, XLS, PPT, CSV, RTF, ODT 等</div><div class="c__tag c__tag--c">Graph API → PDF</div></div>
   </div>
 </div></section>
 
 <!-- Zero Token -->
-<section class="s--a s" id="zero"><div class="w">
+<section class="s"><div class="w">
   <h2 class="s__t">⚡ ゼロトークン印刷</h2>
-  <p class="s__d">curlでアップロード、MCPで印刷指示。base64不要、100ページPDFでもトークン消費ゼロ。</p>
   <div class="pre">
-<span class="c_"># ステップ1: bash_toolでアップロード</span>
-curl -sF <span class="v">"file=@/mnt/user-data/uploads/report.pptx"</span> <span class="k">https://printer-mcp.appserver.tokyo/upload</span>
+<span class="c_"># curlでアップロード → file_id取得 → MCPで印刷</span>
+curl -sF <span class="v">"file=@photo.heic"</span> <span class="k">https://printer-mcp.appserver.tokyo/upload</span>
 → {<span class="k">"file_id"</span>:<span class="v">"abc123"</span>}
-
-<span class="c_"># ステップ2: MCPツールで印刷</span>
-<span class="k">print_uploaded</span>(file_id=<span class="v">"abc123"</span>, cups_options={<span class="k">"Stpl"</span>:<span class="v">"DualLeft"</span>,<span class="k">"Scnt"</span>:<span class="v">"All"</span>})
+<span class="k">print_uploaded</span>(file_id=<span class="v">"abc123"</span>, cups_options={<span class="k">"Duplex"</span>:<span class="v">"DuplexNoTumble"</span>})
+<span class="c_">// HEIC → ImageMagick → JPEG → CUPS → 印刷</span>
   </div>
 </div></section>
 
 <!-- Staple -->
-<section class="s" id="staple"><div class="w">
+<section class="s--a s" id="staple"><div class="w">
   <h2 class="s__t">📎 ステープル（7種類）</h2>
-  <p class="s__d"><a href="https://dam.kyoceradocumentsolutions.com/content/dam/gdam_dc/dc_global/document/manual/common/PrescribeCom_KD_EN_202301.pdf" target="_blank">PRESCRIBE Commands Reference</a> のSTTPLコマンド仕様に基づくStaplePosition値をPPDに追加。実機検証済み。</p>
+  <p class="s__d"><a href="https://dam.kyoceradocumentsolutions.com/content/dam/gdam_dc/dc_global/document/manual/common/PrescribeCom_KD_EN_202301.pdf" target="_blank">PRESCRIBE Commands Reference</a> のSTTPLコマンド仕様に基づく。</p>
   <div class="g4">
-    <div class="c"><div class="c__h">Front</div><div class="c__p">左下コーナー<br>1箇所</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
-    <div class="c"><div class="c__h">Rear</div><div class="c__p">左上コーナー<br>1箇所</div></div>
-    <div class="c" style="border-color:rgba(6,182,212,.3)"><div class="c__h">DualLeft</div><div class="c__p"><strong>左辺2箇所</strong><br>最も一般的</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
-    <div class="c"><div class="c__h">TopRight</div><div class="c__p">右上コーナー<br>1箇所</div></div>
+    <div class="c"><div class="c__h">Front</div><div class="c__p">左下コーナー1箇所</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
+    <div class="c"><div class="c__h">Rear</div><div class="c__p">左上コーナー1箇所</div></div>
+    <div class="c" style="border-color:rgba(6,182,212,.3)"><div class="c__h">DualLeft</div><div class="c__p"><strong>左辺2箇所</strong></div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
+    <div class="c"><div class="c__h">TopRight</div><div class="c__p">右上コーナー1箇所</div></div>
     <div class="c"><div class="c__h">DualRight</div><div class="c__p">右辺2箇所</div></div>
     <div class="c"><div class="c__h">DualTop</div><div class="c__p">上辺2箇所</div></div>
-    <div class="c"><div class="c__h">Center</div><div class="c__p">=DualLeft<br>(PPD互換名)</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
-  </div>
-  <div class="pre" style="margin-top:1.5rem">
-<span class="c_">// A4両面 + 左辺2箇所ステープル（最も一般的なビジネス文書）</span>
-{<span class="k">"Stpl"</span>:<span class="v">"DualLeft"</span>, <span class="k">"Scnt"</span>:<span class="v">"All"</span>, <span class="k">"Duplex"</span>:<span class="v">"DuplexNoTumble"</span>, <span class="k">"PageSize"</span>:<span class="v">"A4"</span>}
   </div>
 </div></section>
 
 <!-- Booklet -->
-<section class="s--a s" id="booklet"><div class="w">
+<section class="s" id="booklet"><div class="w">
   <h2 class="s__t">📖 中綴じ製本</h2>
-  <p class="s__d">タテ(左右めくり)もヨコ(上下見開き)も対応。面付け(number-up)との組み合わせも可能。全て実機検証済み。</p>
   <div class="g3">
-    <div class="c"><div class="c__i">📄</div><div class="c__h">A4タテ 左綴じ</div><div class="c__p">KCBooklet=Left, Fold=True<br>A3紙→折り→A4冊子</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
-    <div class="c"><div class="c__i">📐</div><div class="c__h">A4ヨコ 上下見開き</div><div class="c__p">+ orientation-requested=4<br>上辺綴じ、上下にめくる</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
-    <div class="c"><div class="c__i">🖼️</div><div class="c__h">PPTX 2up→中綴じ</div><div class="c__p">number-up=2 + KCBooklet<br>横長スライド→A4冊子</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
-  </div>
-  <div class="pre" style="margin-top:1rem">
-<span class="c_">// A4横向き中綴じ（上下見開き冊子）</span>
-{<span class="k">"KCBooklet"</span>:<span class="v">"Left"</span>, <span class="k">"Fold"</span>:<span class="v">"True"</span>, <span class="k">"PageSize"</span>:<span class="v">"A4"</span>, <span class="k">"orientation-requested"</span>:<span class="v">"4"</span>}
-
-<span class="c_">// 横長PPTX → A4縦2スライド配置 → 中綴じ製本</span>
-{<span class="k">"number-up"</span>:<span class="v">"2"</span>, <span class="k">"KCBooklet"</span>:<span class="v">"Left"</span>, <span class="k">"Fold"</span>:<span class="v">"True"</span>, <span class="k">"PageSize"</span>:<span class="v">"A4"</span>}
+    <div class="c"><div class="c__h">A4タテ 左綴じ</div><div class="c__p">KCBooklet=Left, Fold=True<br>A3紙→折り→A4冊子</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
+    <div class="c"><div class="c__h">A4ヨコ 上下見開き</div><div class="c__p">+ orientation-requested=4<br>上辺綴じ、上下にめくる</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
+    <div class="c"><div class="c__h">PPTX 2up→中綴じ</div><div class="c__p">number-up=2 + KCBooklet<br>横長スライド→A4冊子</div><div class="c__tag c__tag--g">✅ 実機確認</div></div>
   </div>
 </div></section>
 
 <!-- Tools -->
-<section class="s" id="tools"><div class="w">
+<section class="s--a s" id="tools"><div class="w">
   <h2 class="s__t">⚡ 11 MCPツール</h2>
   <table class="tbl">
     <thead><tr><th>#</th><th>ツール</th><th>種別</th><th>説明</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td><code>print_uploaded</code></td><td><span class="tag tag-w">W</span></td><td><strong>メイン印刷。</strong> /upload→file_id→印刷（ゼロトークン）</td></tr>
+      <tr><td>1</td><td><code>print_uploaded</code></td><td><span class="tag tag-w">W</span></td><td><strong>メイン印刷。</strong> 70形式対応、ゼロトークン</td></tr>
       <tr><td>2</td><td><code>print_url</code></td><td><span class="tag tag-w">W</span></td><td>URLダウンロード→変換→印刷</td></tr>
-      <tr><td>3</td><td><code>validate_print_options</code></td><td><span class="tag tag-r">R</span></td><td><strong>3,192件PPD + CUPSビルトイン検証</strong></td></tr>
+      <tr><td>3</td><td><code>validate_print_options</code></td><td><span class="tag tag-r">R</span></td><td>3,192件PPD + CUPSビルトイン検証</td></tr>
       <tr><td>4</td><td><code>list_uploads</code></td><td><span class="tag tag-r">R</span></td><td>アップロード済みファイル一覧</td></tr>
       <tr><td>5</td><td><code>get_printer_capabilities</code></td><td><span class="tag tag-r">R</span></td><td>PPDオプション (filter付)</td></tr>
-      <tr><td>6</td><td><code>get_supported_formats</code></td><td><span class="tag tag-r">R</span></td><td>対応形式一覧</td></tr>
+      <tr><td>6</td><td><code>get_supported_formats</code></td><td><span class="tag tag-r">R</span></td><td>対応形式一覧(4カテゴリ)</td></tr>
       <tr><td>7</td><td><code>list_printers</code></td><td><span class="tag tag-r">R</span></td><td>プリンタ一覧</td></tr>
       <tr><td>8</td><td><code>get_printer_status</code></td><td><span class="tag tag-r">R</span></td><td>状態 + トレイ紙設定</td></tr>
       <tr><td>9</td><td><code>get_print_jobs</code></td><td><span class="tag tag-r">R</span></td><td>キュー一覧</td></tr>
@@ -168,10 +155,10 @@ curl -sF <span class="v">"file=@/mnt/user-data/uploads/report.pptx"</span> <span
 </div></section>
 
 <!-- Workflow -->
-<section class="s--a s"><div class="w">
-  <h2 class="s__t">🤖 AIの推奨ワークフロー</h2>
+<section class="s"><div class="w">
+  <h2 class="s__t">🤖 ワークフロー</h2>
   <div class="flow">
-    <div class="flow__s"><div class="flow__n">①</div>get_printer_status<br><small style="color:var(--tx3)">トレイ紙確認</small></div>
+    <div class="flow__s"><div class="flow__n">①</div>get_printer_status<br><small style="color:var(--tx3)">トレイ確認</small></div>
     <div class="flow__s"><div class="flow__n">②</div>curl /upload<br><small style="color:var(--tx3)">ファイル送信</small></div>
     <div class="flow__s"><div class="flow__n">③</div>validate<br><small style="color:var(--tx3)">3,192ルール</small></div>
     <div class="flow__s"><div class="flow__n">④</div>print_uploaded<br><small style="color:var(--tx3)">変換+印刷</small></div>
@@ -179,26 +166,13 @@ curl -sF <span class="v">"file=@/mnt/user-data/uploads/report.pptx"</span> <span
   </div>
 </div></section>
 
-<!-- Setup -->
-<section class="s" id="setup"><div class="w">
-  <h2 class="s__t">🚀 セットアップ（5ステップ）</h2>
-  <p class="s__d">Proxmox LXC + CUPS + Kyoceraドライバ + Cloudflare Tunnel の構成。</p>
-  <div class="steps">
-    <div class="step"><div class="step__h">Proxmox LXCコンテナ作成</div><div class="step__p">Ubuntu 24.04テンプレートからクローン。2コア/4GB/20GB。</div></div>
-    <div class="step"><div class="step__h">CUPS + Kyoceraドライバ + プリンタ登録</div><div class="step__p">CUPS, Kyocera UPD v10.0, lpadminでsocket://登録。フィニッシャー設定（DF-7150, Punch, Fold, Inserter）。PPDカスタマイズ（DualLeft等のステープル追加）。</div></div>
-    <div class="step"><div class="step__h">MCPサーバーデプロイ</div><div class="step__p">Node.js 22 → git clone → npm install → systemd。環境変数にMCP_API_KEY, GRAPH_*。</div></div>
-    <div class="step"><div class="step__h">Cloudflare Tunnel</div><div class="step__p">cloudflared → hostname → http://localhost:3000。</div></div>
-    <div class="step"><div class="step__h">Claude.aiに接続</div><div class="step__p">Settings → MCP → Add。URL: https://printer-mcp.your-domain/mcp?key=KEY</div></div>
-  </div>
-</div></section>
-
 <!-- Reference -->
-<section class="s--a s"><div class="w">
+<section class="s--a s" id="ref"><div class="w">
   <h2 class="s__t">📚 リファレンス</h2>
   <div class="g3">
-    <div class="c"><div class="c__h">PRESCRIBE Commands Reference</div><div class="c__p">STTPLコマンド（ステープル位置）、STTPCコマンド（ステープル枚数）等の全コマンド仕様。PPDカスタマイズの根拠。</div><div style="margin-top:.5rem"><a href="https://dam.kyoceradocumentsolutions.com/content/dam/gdam_dc/dc_global/document/manual/common/PrescribeCom_KD_EN_202301.pdf" target="_blank" style="font-size:.8rem">PDF →</a></div></div>
-    <div class="c"><div class="c__h">TASKalfa 6054ci Operation Guide</div><div class="c__p">操作ガイド。フィニッシャー操作、用紙設定、トラブルシューティング。</div><div style="margin-top:.5rem"><a href="https://www.kyoceradocumentsolutions.us/content/dam/download-center-americas-cf/us/documents/user-guides/2554ci_3554ci_4054ci_5054ci_6054ci_7054ciENOGR2024_7_pdf.download.pdf" target="_blank" style="font-size:.8rem">PDF →</a></div></div>
-    <div class="c"><div class="c__h">OpenPrinting Kyocera PPD</div><div class="c__p">Kyocera公式PostScript PPDファイル。Linux/macOS用ドライバの元。</div><div style="margin-top:.5rem"><a href="https://www.openprinting.org/driver/Postscript-Kyocera/" target="_blank" style="font-size:.8rem">Link →</a></div></div>
+    <div class="c"><div class="c__h">PRESCRIBE Commands Reference</div><div class="c__p">ステープル位置(STPL)、枚数(STPC)等のコマンド仕様。PPDカスタマイズの根拠。</div><div style="margin-top:.5rem"><a href="https://dam.kyoceradocumentsolutions.com/content/dam/gdam_dc/dc_global/document/manual/common/PrescribeCom_KD_EN_202301.pdf" target="_blank" style="font-size:.8rem">PDF →</a></div></div>
+    <div class="c"><div class="c__h">TASKalfa 6054ci Operation Guide</div><div class="c__p">操作ガイド。フィニッシャー操作、用紙設定。</div><div style="margin-top:.5rem"><a href="https://www.kyoceradocumentsolutions.us/content/dam/download-center-americas-cf/us/documents/user-guides/2554ci_3554ci_4054ci_5054ci_6054ci_7054ciENOGR2024_7_pdf.download.pdf" target="_blank" style="font-size:.8rem">PDF →</a></div></div>
+    <div class="c"><div class="c__h">OpenPrinting Kyocera PPD</div><div class="c__p">公式PostScript PPDファイル。</div><div style="margin-top:.5rem"><a href="https://www.openprinting.org/driver/Postscript-Kyocera/" target="_blank" style="font-size:.8rem">Link →</a></div></div>
   </div>
 </div></section>
 
