@@ -1,9 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  PrintDocumentInputSchema,
   PrintUrlInputSchema,
-  ConvertToPdfInputSchema,
   ValidatePrintOptionsInputSchema,
   ListPrintersInputSchema,
   GetPrinterStatusInputSchema,
@@ -14,9 +12,7 @@ import {
   GetSupportedFormatsInputSchema,
   PrintUploadedInputSchema,
   ListUploadsInputSchema,
-  type PrintDocumentInput,
   type PrintUrlInput,
-  type ConvertToPdfInput,
   type ValidatePrintOptionsInput,
   type GetPrinterStatusInput,
   type GetPrinterCapabilitiesInput,
@@ -100,44 +96,7 @@ async function processAndPrint(
 
 export function registerPrinterTools(server: McpServer): void {
 
-  // ═══ 1. print_document ════════════════════════════════════
-
-  server.registerTool(
-    "print_document",
-    {
-      title: "Print document",
-      description: `⚠ DO NOT USE THIS TOOL. Use print_uploaded instead.
-
-print_document requires base64-encoded file content in the arguments, which consumes hundreds of thousands of tokens for even small files. This wastes context and money.
-
-ALWAYS use this flow instead:
-  1. bash_tool: curl -sF "file=@/mnt/user-data/uploads/FILENAME" https://printer-mcp.appserver.tokyo/upload
-     → Returns {"file_id":"abc123"}
-  2. print_uploaded(file_id="abc123", cups_options={...})
-
-This tool exists only as a fallback for programmatic use where base64 is already available.`,
-      inputSchema: PrintDocumentInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    },
-    async (params: PrintDocumentInput) => {
-      try {
-        const result = await processAndPrint(params.document_base64, params.filename, {
-          printer: params.printer,
-          copies: params.copies,
-          duplex: params.duplex,
-          paperSize: params.paper_size,
-          colorMode: params.color_mode,
-          orientation: params.orientation,
-          pageRanges: params.page_ranges,
-          fitToPage: params.fit_to_page,
-          cupsOptions: params.cups_options,
-        });
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !result.success };
-      } catch (e) { return err(`Error: ${(e as Error).message}`); }
-    }
-  );
-
-  // ═══ 2. print_url ════════════════════════════════════════
+  // ═══ 1. print_url ════════════════════════════════════════
 
   server.registerTool(
     "print_url",
@@ -169,51 +128,7 @@ The filename parameter is used for format detection (e.g. 'report.docx').`,
     }
   );
 
-  // ═══ 3. convert_to_pdf ═══════════════════════════════════
-
-  server.registerTool(
-    "convert_to_pdf",
-    {
-      title: "Convert to PDF",
-      description: `Convert Office document to PDF (without printing). Returns PDF as base64.
-⚠ This tool requires base64 input which consumes many tokens. For printing, use print_uploaded instead (upload via curl, zero tokens).`,
-      inputSchema: ConvertToPdfInputSchema,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    },
-    async (params: ConvertToPdfInput) => {
-      try {
-        const route = converter.detectRoute(params.filename);
-
-        if (route === "direct") {
-          return ok({ success: true, message: "File is already in a directly printable format (PDF/image/text). No conversion needed.", pdfBase64: params.document_base64 });
-        }
-        if (route === "unsupported") {
-          return err(`Unsupported format: ${params.filename}`);
-        }
-        if (!converter.isOfficeConversionAvailable()) {
-          return err("No Office converter configured. Set GRAPH_* env vars (or MAC_HOST + MAC_USER for Mac).");
-        }
-
-        const buf = Buffer.from(params.document_base64, "base64");
-        const result = await converter.convertOfficeFile(buf, params.filename);
-
-        if (result.pdfPath) await converter.cleanupTempPdf(result.pdfPath);
-
-        if (!result.success) return err(result.error);
-
-        return ok({
-          success: true,
-          originalFile: result.originalFile,
-          pdfSize: result.fileSize,
-          pdfSizeKB: Math.round(result.fileSize / 1024),
-          pdfBase64: result.pdfBase64,
-          message: `Converted ${result.originalFile} → PDF (${Math.round(result.fileSize / 1024)} KB)`,
-        });
-      } catch (e) { return err(`Error: ${(e as Error).message}`); }
-    }
-  );
-
-  // ═══ 4. list_printers ════════════════════════════════════
+  // ═══ 2. list_printers ════════════════════════════════════
 
   server.registerTool(
     "list_printers",

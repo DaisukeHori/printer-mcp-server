@@ -22,21 +22,6 @@ COMMON:
   A4中綴じ左綴じ: {"KCBooklet":"Left","Fold":"True","PageSize":"A4"}
   A4三つ折り: {"FldA":"Trifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A4"}`;
 
-export const PrintDocumentInputSchema = z.object({
-  document_base64: z.string().min(1).describe("Base64-encoded document content"),
-  filename: z.string().min(1).max(255).describe("Filename with extension. Office auto-converted to PDF."),
-  printer: z.string().optional().describe("Default: TASKalfa-6054ci"),
-  copies: z.number().int().min(1).max(999).default(1),
-  duplex: z.enum(["one-sided", "two-sided-long-edge", "two-sided-short-edge"]).optional(),
-  paper_size: z.string().optional(),
-  color_mode: z.enum(["color", "monochrome"]).optional(),
-  orientation: z.enum(["portrait", "landscape"]).optional(),
-  page_ranges: z.string().optional().describe("'1-5', '2,4,6'"),
-  fit_to_page: z.boolean().default(false),
-  cups_options: z.record(z.string(), z.string()).optional().describe(CUPS_OPTIONS_DESC),
-}).strict();
-export type PrintDocumentInput = z.infer<typeof PrintDocumentInputSchema>;
-
 export const ValidatePrintOptionsInputSchema = z.object({
   cups_options: z.record(z.string(), z.string()).describe("Options to validate before printing"),
   printer: z.string().optional().describe("Default: TASKalfa-6054ci"),
@@ -72,12 +57,6 @@ export const CancelPrintJobInputSchema = z.object({
   job_id: z.string().min(1),
 }).strict();
 export type CancelPrintJobInput = z.infer<typeof CancelPrintJobInputSchema>;
-
-export const ConvertToPdfInputSchema = z.object({
-  document_base64: z.string().min(1),
-  filename: z.string().min(1).max(255),
-}).strict();
-export type ConvertToPdfInput = z.infer<typeof ConvertToPdfInputSchema>;
 
 export const PrintUrlInputSchema = z.object({
   url: z.string().url(),
