@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>printer-mcp-server — AIに「印刷して」と言うだけ</title>
+<meta name="description" content="Kyocera TASKalfa 6054ciをMCP化。11ツール、Office自動変換、3192件のPPD制約バリデーション、フィニッシャー完全制御。">
+<meta name="author" content="Daisuke Hori">
+<meta property="og:title" content="printer-mcp-server — 11 Tools">
+<meta property="og:description" content="AIに「印刷して」と言うだけ。ステープル・パンチ・中綴じ・折りをAIが自動制御。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:type" content="website">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --accent:#06b6d4;--accent2:#0891b2;--accent-glow:rgba(6,182,212,.15);
+  --red:#ef4444;--green:#22c55e;--yellow:#eab308;--blue:#3b82f6;
+  --radius:12px;--mono:'JetBrains Mono',monospace;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Nav */
+.nav{position:sticky;top:0;z-index:100;background:rgba(10,14,26,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);padding:.75rem 0}
+.nav__inner{max-width:1100px;margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.nav__brand{font-family:var(--mono);font-weight:700;font-size:1rem;color:var(--text);display:flex;align-items:center;gap:.5rem}
+.nav__brand svg{width:24px;height:24px}
+.nav__links{display:flex;gap:1.5rem;list-style:none;font-size:.85rem}
+.nav__links a{color:var(--text2);transition:color .2s}
+.nav__links a:hover,.nav__links a.active{color:var(--accent);text-decoration:none}
+.badge{font-size:.7rem;padding:.25rem .6rem;border-radius:20px;background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25);display:flex;align-items:center;gap:.35rem}
+.badge__dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Hero */
+.hero{padding:5rem 1.5rem 4rem;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%,var(--accent-glow) 0%,transparent 50%);pointer-events:none}
+.hero__tag{display:inline-flex;align-items:center;gap:.5rem;font-size:.8rem;color:var(--accent);background:var(--accent-glow);border:1px solid rgba(6,182,212,.2);padding:.4rem 1rem;border-radius:20px;margin-bottom:1.5rem}
+.hero h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:900;line-height:1.2;margin-bottom:1rem}
+.hero h1 span{background:linear-gradient(135deg,var(--accent),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero__sub{font-size:1.05rem;color:var(--text2);max-width:700px;margin:0 auto 2rem;line-height:1.8}
+.hero__endpoint{font-family:var(--mono);font-size:.8rem;background:var(--surface);border:1px solid rgba(255,255,255,.08);padding:.6rem 1.2rem;border-radius:8px;display:inline-block;color:var(--text3)}
+.hero__endpoint code{color:var(--accent)}
+
+/* Section */
+.section{max-width:1100px;margin:0 auto;padding:4rem 1.5rem}
+.section__title{font-size:1.6rem;font-weight:700;margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem}
+.section__sub{color:var(--text2);margin-bottom:2rem;font-size:.95rem}
+
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem}
+.card{background:var(--surface);border:1px solid rgba(255,255,255,.06);border-radius:var(--radius);padding:1.5rem;transition:border-color .3s,transform .3s}
+.card:hover{border-color:rgba(6,182,212,.3);transform:translateY(-2px)}
+.card__icon{font-size:1.5rem;margin-bottom:.75rem}
+.card__title{font-weight:700;margin-bottom:.5rem}
+.card__text{color:var(--text2);font-size:.85rem;line-height:1.7}
+
+/* Tools table */
+.tools-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.tools-table th{text-align:left;padding:.6rem .8rem;color:var(--text3);font-weight:500;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(255,255,255,.08)}
+.tools-table td{padding:.6rem .8rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.tools-table tr:hover td{background:rgba(255,255,255,.02)}
+.tools-table .tag{font-size:.65rem;padding:.15rem .4rem;border-radius:4px;font-family:var(--mono);font-weight:500}
+.tag--w{background:rgba(59,130,246,.15);color:var(--blue)}
+.tag--r{background:rgba(34,197,94,.15);color:var(--green)}
+.tag--d{background:rgba(239,68,68,.15);color:var(--red)}
+
+/* Code block */
+.code-block{background:var(--surface);border:1px solid rgba(255,255,255,.06);border-radius:var(--radius);padding:1.2rem 1.5rem;font-family:var(--mono);font-size:.8rem;line-height:1.8;overflow-x:auto;color:var(--text2);margin:1rem 0}
+.code-block .comment{color:var(--text3)}
+.code-block .key{color:var(--accent)}
+.code-block .val{color:var(--yellow)}
+
+/* Constraint demo */
+.constraint{background:var(--surface);border-radius:var(--radius);padding:1.2rem;margin:.75rem 0;border-left:3px solid var(--red);font-size:.85rem}
+.constraint--ok{border-left-color:var(--green)}
+.constraint__label{font-weight:700;margin-bottom:.3rem}
+.constraint__msg{color:var(--text2)}
+
+/* Specs grid */
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin:1.5rem 0}
+.spec{background:var(--surface2);border-radius:var(--radius);padding:1.2rem;text-align:center}
+.spec__val{font-size:2rem;font-weight:900;font-family:var(--mono);color:var(--accent)}
+.spec__label{font-size:.75rem;color:var(--text3);margin-top:.25rem}
+
+/* Footer */
+.footer{text-align:center;padding:3rem 1.5rem;color:var(--text3);font-size:.8rem;border-top:1px solid rgba(255,255,255,.06)}
+
+@media(max-width:640px){
+  .nav__links{display:none}
+  .cards{grid-template-columns:1fr}
+  .specs{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav"><div class="nav__inner">
+  <a href="#" class="nav__brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="6" y1="7" x2="18" y2="7"/><line x1="6" y1="15" x2="18" y2="15"/><rect x="10" y="17" width="4" height="2" rx=".5" fill="currentColor"/></svg>
+    printer-mcp
+  </a>
+  <ul class="nav__links">
+    <li><a href="#tools">ツール</a></li>
+    <li><a href="#finisher">フィニッシャー</a></li>
+    <li><a href="#validation">バリデーション</a></li>
+    <li><a href="#setup">セットアップ</a></li>
+    <li><a href="https://github.com/DaisukeHori/printer-mcp-server" target="_blank">GitHub</a></li>
+  </ul>
+  <span class="badge"><span class="badge__dot"></span>Operational</span>
+</div></nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero__tag">🖨 11 MCP Tools + 3,192 PPD Constraint Rules + Office Auto-Convert</div>
+  <h1>AIに<span>「印刷して」</span><br>と言うだけ</h1>
+  <p class="hero__sub">Kyocera TASKalfa 6054ci をMCP化。ステープル・パンチ・中綴じ製本・折りをAIが自動制御。3,192件のPPDハードウェア制約ルールで事前バリデーション。Office文書はGraph APIで自動PDF変換。</p>
+  <div class="hero__endpoint">Endpoint: <code>https://printer-mcp.appserver.tokyo/mcp</code></div>
+</section>
+
+<!-- Stats -->
+<section class="section">
+  <div class="specs">
+    <div class="spec"><div class="spec__val">11</div><div class="spec__label">MCPツール</div></div>
+    <div class="spec"><div class="spec__val">3,192</div><div class="spec__label">PPD制約ルール</div></div>
+    <div class="spec"><div class="spec__val">100枚</div><div class="spec__label">ステープル上限</div></div>
+    <div class="spec"><div class="spec__val">80p</div><div class="spec__label">中綴じ製本上限</div></div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="section">
+  <h2 class="section__title">📐 アーキテクチャ</h2>
+  <p class="section__sub">Claude.ai → Cloudflare Tunnel → LXC (CUPS + Kyocera UPD) → プリンタ。Office文書はGraph APIでPDF変換後に印刷。</p>
+  <div class="code-block">
+<span class="comment">Claude.ai / Claude Code / Cursor</span>
+  ↓ MCP (Streamable HTTP)
+<span class="comment">Cloudflare Tunnel</span> (printer-mcp.appserver.tokyo)
+  ↓
+┌───────────────────────────────────────────┐
+│ <span class="key">Proxmox LXC</span> (Ubuntu 24.04)               │
+│  printer-mcp-server (Node.js 22)          │
+│   ├── PDF/画像/テキスト → 直接CUPS         │
+│   ├── Office → <span class="val">Graph API</span> → PDF → CUPS   │
+│   └── validate → <span class="val">3,192</span> PPD制約ルール     │
+│  CUPS + Kyocera UPD v10.0                 │
+│   └── socket:// → <span class="key">TASKalfa 6054ci</span>       │
+└───────────────────────────────────────────┘
+  </div>
+</section>
+
+<!-- Hardware -->
+<section class="section">
+  <h2 class="section__title">🔧 ハードウェア構成</h2>
+  <p class="section__sub">DF-7150フィニッシャー＋BF-9100中折りユニット＋パンチ＋インサーター</p>
+  <div class="cards">
+    <div class="card"><div class="card__icon">📎</div><div class="card__title">DF-7150 フィニッシャー</div><div class="card__text">4,000枚排紙。3種類の100枚ステープル（左上/右上/中綴じ）。シフトソート対応。</div></div>
+    <div class="card"><div class="card__icon">📖</div><div class="card__title">BF-9100 中折りユニット</div><div class="card__text">中綴じ製本（最大20枚=80ページ）。三つ折り（A4/Letter）。二つ折り。60-90gsm普通紙。</div></div>
+    <div class="card"><div class="card__icon">🕳️</div><div class="card__title">PH-7B パンチユニット</div><div class="card__text">2穴・3穴・4穴対応。A4/A3/B4/B5/Letter等の標準サイズで利用可能。</div></div>
+    <div class="card"><div class="card__icon">📑</div><div class="card__title">IS-7100 インサーター</div><div class="card__text">2トレイ。表紙・裏表紙・章区切り合紙の自動挿入。冊子やカタログ制作に。</div></div>
+  </div>
+</section>
+
+<!-- Tools -->
+<section class="section" id="tools">
+  <h2 class="section__title">⚡ 11 MCPツール</h2>
+  <p class="section__sub">印刷・変換・バリデーション・プリンタ管理の全機能</p>
+  <table class="tools-table">
+    <thead><tr><th>#</th><th>ツール</th><th>種別</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>print_document</code></td><td><span class="tag tag--w">Write</span></td><td>ファイル印刷。Office自動変換＋フィニッシャー完全対応</td></tr>
+      <tr><td>2</td><td><code>print_url</code></td><td><span class="tag tag--w">Write</span></td><td>URLからダウンロード→変換→印刷</td></tr>
+      <tr><td>3</td><td><code>convert_to_pdf</code></td><td><span class="tag tag--r">Read</span></td><td>Office→PDF変換のみ（プレビュー用）</td></tr>
+      <tr><td>4</td><td><code>validate_print_options</code></td><td><span class="tag tag--r">Read</span></td><td><strong>3,192件PPD制約で事前検証</strong></td></tr>
+      <tr><td>5</td><td><code>list_printers</code></td><td><span class="tag tag--r">Read</span></td><td>プリンタ一覧</td></tr>
+      <tr><td>6</td><td><code>get_printer_status</code></td><td><span class="tag tag--r">Read</span></td><td>詳細ステータス+トレイ紙設定</td></tr>
+      <tr><td>7</td><td><code>get_printer_capabilities</code></td><td><span class="tag tag--r">Read</span></td><td>PPDオプション一覧(filter付)</td></tr>
+      <tr><td>8</td><td><code>get_print_jobs</code></td><td><span class="tag tag--r">Read</span></td><td>キュー一覧(完了含む)</td></tr>
+      <tr><td>9</td><td><code>get_job_status</code></td><td><span class="tag tag--r">Read</span></td><td>ジョブ詳細+CUPSエラーログ</td></tr>
+      <tr><td>10</td><td><code>cancel_print_job</code></td><td><span class="tag tag--d">Destructive</span></td><td>ジョブキャンセル</td></tr>
+      <tr><td>11</td><td><code>get_supported_formats</code></td><td><span class="tag tag--r">Read</span></td><td>対応形式一覧</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Finisher -->
+<section class="section" id="finisher">
+  <h2 class="section__title">📎 フィニッシャー機能詳細</h2>
+  <p class="section__sub">cups_optionsで全機能を制御。descriptionに全オプション・制約・組み合わせ例を焼き込み済み。</p>
+
+  <h3 style="margin:1.5rem 0 .5rem;font-size:1.1rem">中綴じ製本</h3>
+  <div class="code-block">
+<span class="comment">// A4中綴じ製本（左綴じ・横書き） → A3紙に2面付け → 折り → A4冊子</span>
+{<span class="key">"KCBooklet"</span>:<span class="val">"Left"</span>, <span class="key">"Fold"</span>:<span class="val">"True"</span>, <span class="key">"PageSize"</span>:<span class="val">"A4"</span>}
+
+<span class="comment">// B5中綴じ製本（右綴じ・縦書き） → B4紙使用</span>
+{<span class="key">"KCBooklet"</span>:<span class="val">"Right"</span>, <span class="key">"Fold"</span>:<span class="val">"True"</span>, <span class="key">"PageSize"</span>:<span class="val">"B5"</span>}
+  </div>
+  <p style="color:var(--text2);font-size:.85rem;margin-top:.5rem">⚠ PageSizeは仕上がりサイズ。A4→A3紙、B5→B4紙を自動使用。最大20枚(80p)、普通紙のみ。</p>
+
+  <h3 style="margin:1.5rem 0 .5rem;font-size:1.1rem">三つ折り・二つ折り</h3>
+  <div class="code-block">
+<span class="comment">// A4三つ折り（宛名が外側に見える、DM封筒用）</span>
+{<span class="key">"FldA"</span>:<span class="val">"Trifold"</span>, <span class="key">"FldB"</span>:<span class="val">"FPInside"</span>, <span class="key">"FldC"</span>:<span class="val">"RIGHTL"</span>,
+ <span class="key">"OutputBin"</span>:<span class="val">"FLDTRAY"</span>, <span class="key">"PageSize"</span>:<span class="val">"A4"</span>}
+  </div>
+
+  <h3 style="margin:1.5rem 0 .5rem;font-size:1.1rem">ステープル＋パンチ</h3>
+  <div class="code-block">
+<span class="comment">// A4両面 + 左上ステープル + 2穴パンチ</span>
+{<span class="key">"Stpl"</span>:<span class="val">"Front"</span>, <span class="key">"Scnt"</span>:<span class="val">"All"</span>, <span class="key">"Pnch"</span>:<span class="val">"2Hole"</span>,
+ <span class="key">"Duplex"</span>:<span class="val">"DuplexNoTumble"</span>, <span class="key">"PageSize"</span>:<span class="val">"A4"</span>}
+  </div>
+</section>
+
+<!-- Validation -->
+<section class="section" id="validation">
+  <h2 class="section__title">🛡️ PPD制約バリデーション</h2>
+  <p class="section__sub">Kyocera PPDファイルから抽出した3,192件のハードウェア制約ルールで、印刷前にオプション互換性を自動検証。</p>
+
+  <div class="constraint">
+    <div class="constraint__label">❌ 中綴じ + コーナーステープル</div>
+    <div class="constraint__msg">ステープル(Front) と 中綴じ製本(Left) は同時に指定できません</div>
+  </div>
+  <div class="constraint">
+    <div class="constraint__label">❌ A5 + 二つ折り</div>
+    <div class="constraint__msg">折りモード(Bifold) と 用紙サイズ(A5) は同時に指定できません</div>
+  </div>
+  <div class="constraint">
+    <div class="constraint__label">❌ 厚紙 + パンチ</div>
+    <div class="constraint__msg">用紙種類(Cardstock) と パンチ(2Hole) は同時に指定できません</div>
+  </div>
+  <div class="constraint constraint--ok">
+    <div class="constraint__label">✅ A4両面 + ステープル + パンチ</div>
+    <div class="constraint__msg">全て有効。印刷できます。（2,134ルール検査済み、違反0）</div>
+  </div>
+
+  <h3 style="margin:2rem 0 .75rem;font-size:1.1rem">10の重要ルール</h3>
+  <div style="color:var(--text2);font-size:.85rem;line-height:2">
+    1. 中綴じとステープルは同時不可（中綴じは自動ステープル）<br>
+    2. 折り使用時は OutputBin=FLDTRAY 必須<br>
+    3. A5以下はステープル/折り不可<br>
+    4. 封筒/ラベル/OHPは後処理全不可<br>
+    5. 厚紙はステープル/パンチ/折り全不可<br>
+    6. 中綴じPageSizeは仕上がりサイズ（A4→A3紙自動）<br>
+    7. 三つ折りはA4/Letterのみ<br>
+    8. 中綴じ最大20枚(80p)、折り最大3枚、普通紙のみ<br>
+    9. 印刷前に validate_print_options で必ず検証<br>
+    10. get_printer_status でトレイ紙設定を確認してから印刷
+  </div>
+</section>
+
+<!-- Setup -->
+<section class="section" id="setup">
+  <h2 class="section__title">🚀 セットアップ</h2>
+  <p class="section__sub">Proxmox LXC + CUPS + Kyoceraドライバ + Cloudflare Tunnel</p>
+  <div class="cards">
+    <div class="card"><div class="card__icon">1️⃣</div><div class="card__title">LXCセットアップ</div><div class="card__text">Proxmox上にUbuntu LXCを作成。CUPS、Kyocera UPDドライバ、Node.js 22をインストール。プリンタ登録＋フィニッシャー設定。</div></div>
+    <div class="card"><div class="card__icon">2️⃣</div><div class="card__title">MCPサーバー起動</div><div class="card__text">リポジトリをクローン → npm install → npm run build → systemdサービス化。Graph API環境変数を設定。</div></div>
+    <div class="card"><div class="card__icon">3️⃣</div><div class="card__title">Cloudflare Tunnel</div><div class="card__text">cloudflaredをインストール。printer-mcp.your-domain → localhost:3000 のトンネルを作成。</div></div>
+    <div class="card"><div class="card__icon">4️⃣</div><div class="card__title">Claude.aiに接続</div><div class="card__text">Settings → MCP → Add。URLにエンドポイント＋APIキーを設定。すぐに使い始められます。</div></div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>printer-mcp-server — MIT License — <a href="https://github.com/DaisukeHori/printer-mcp-server">GitHub</a></p>
+  <p style="margin-top:.5rem">Built by <a href="https://github.com/DaisukeHori">Daisuke Hori</a></p>
+</footer>
+
+</body>
+</html>
