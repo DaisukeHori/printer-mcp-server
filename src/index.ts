@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   });
 
   // ─── File upload endpoint ─────────────────────────────────
-  app.post("/upload", authMiddleware, uploader.single("file"), (req, res) => {
+  app.post("/upload", uploader.single("file"), (req, res) => {
     const file = req.file;
     if (!file) {
       res.status(400).json({ error: "No file uploaded. Use multipart/form-data with field name 'file'." });
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
   });
 
   // List uploaded files
-  app.get("/uploads", authMiddleware, (_req, res) => {
+  app.get("/uploads", (_req, res) => {
     const files = upload.listFiles();
     res.json({ count: files.length, files: files.map(f => ({
       file_id: f.file_id,

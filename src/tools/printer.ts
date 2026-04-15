@@ -449,7 +449,7 @@ Example: validate_print_options(cups_options: {"KCBooklet":"Left","Fold":"True",
 
 WORKFLOW:
   1. User uploads file to Claude.ai
-  2. Claude uses bash_tool: curl -sF "file=@/mnt/user-data/uploads/FILE" https://printer-mcp.appserver.tokyo/upload?key=KEY
+  2. Claude uses bash_tool: curl -sF "file=@/mnt/user-data/uploads/FILE" https://printer-mcp.appserver.tokyo/upload
      → Returns: {"file_id":"abc123","filename":"report.pdf","size":245000}
   3. Claude calls print_uploaded(file_id="abc123", cups_options={...})
 
@@ -506,7 +506,7 @@ This avoids base64 encoding which would consume hundreds of thousands of tokens 
     async () => {
       const files = upload.listFiles();
       if (files.length === 0) {
-        return ok("No uploaded files. Upload via: curl -sF 'file=@path' https://printer-mcp.appserver.tokyo/upload?key=KEY");
+        return ok("No uploaded files. Upload via: curl -sF 'file=@path' https://printer-mcp.appserver.tokyo/upload");
       }
       return ok(files.map(f => ({
         file_id: f.file_id,
