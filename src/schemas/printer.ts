@@ -90,3 +90,20 @@ export type PrintUrlInput = z.infer<typeof PrintUrlInputSchema>;
 
 export const GetSupportedFormatsInputSchema = z.object({}).strict();
 export type GetSupportedFormatsInput = z.infer<typeof GetSupportedFormatsInputSchema>;
+
+export const PrintUploadedInputSchema = z.object({
+  file_id: z.string().min(1).describe("File ID returned by /upload endpoint"),
+  printer: z.string().optional().describe("Default: TASKalfa-6054ci"),
+  copies: z.number().int().min(1).max(999).default(1),
+  duplex: z.enum(["one-sided", "two-sided-long-edge", "two-sided-short-edge"]).optional(),
+  paper_size: z.string().optional(),
+  color_mode: z.enum(["color", "monochrome"]).optional(),
+  orientation: z.enum(["portrait", "landscape"]).optional(),
+  page_ranges: z.string().optional().describe("'1-5', '2,4,6'"),
+  fit_to_page: z.boolean().default(false),
+  cups_options: z.record(z.string(), z.string()).optional().describe(CUPS_OPTIONS_DESC),
+}).strict();
+export type PrintUploadedInput = z.infer<typeof PrintUploadedInputSchema>;
+
+export const ListUploadsInputSchema = z.object({}).strict();
+export type ListUploadsInput = z.infer<typeof ListUploadsInputSchema>;

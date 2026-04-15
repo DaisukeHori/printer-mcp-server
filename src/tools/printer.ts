@@ -12,6 +12,8 @@ import {
   GetJobStatusInputSchema,
   CancelPrintJobInputSchema,
   GetSupportedFormatsInputSchema,
+  PrintUploadedInputSchema,
+  ListUploadsInputSchema,
   type PrintDocumentInput,
   type PrintUrlInput,
   type ConvertToPdfInput,
@@ -21,11 +23,12 @@ import {
   type GetPrintJobsInput,
   type GetJobStatusInput,
   type CancelPrintJobInput,
+  type PrintUploadedInput,
 } from "../schemas/printer.js";
 import * as cups from "../services/cups.js";
 import * as converter from "../services/converter.js";
 import * as ppdConstraints from "../services/ppdConstraints.js";
-// Use unified conversion: Mac (primary) → Graph API (fallback)
+import * as upload from "../services/upload.js";
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -433,6 +436,84 @@ Example: validate_print_options(cups_options: {"KCBooklet":"Left","Fold":"True",
           },
         });
       } catch (e) { return err(`Error: ${(e as Error).message}`); }
+    }
+  );
+
+  // ═══ 12. print_uploaded ════════════════════════════════════
+
+  server.registerTool(
+    "print_uploaded",
+    {
+      title: "Print uploaded file",
+      description: `Print a file that was uploaded via /upload endpoint. NO base64 needed — zero token cost.
+
+WORKFLOW:
+  1. User uploads file to Claude.ai
+  2. Claude uses bash_tool: curl -sF "file=@/mnt/user-data/uploads/FILE" https://printer-mcp.appserver.tokyo/upload?key=KEY
+     → Returns: {"file_id":"abc123","filename":"report.pdf","size":245000}
+  3. Claude calls print_uploaded(file_id="abc123", cups_options={...})
+
+This avoids base64 encoding which would consume hundreds of thousands of tokens for large files.`,
+      inputSchema: PrintUploadedInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (params: PrintUploadedInput) => {
+      try {
+        const fileData = await upload.readFileAsBase64(params.file_id);
+        if (!fileData) {
+          return err(`File not found: ${params.file_id}. It may have expired (30 min) or was already used. Re-upload via /upload.`);
+        }
+
+        const cupsOpts: Record<string, string> = { ...(params.cups_options || {}) };
+        const options: cups.PrintOptions = {
+          printer: params.printer,
+          copies: params.copies,
+          cupsOptions: cupsOpts,
+        };
+        if (params.duplex) {
+          const duplexMap: Record<string, string> = {
+            "one-sided": "None", "two-sided-long-edge": "DuplexNoTumble", "two-sided-short-edge": "DuplexTumble",
+          };
+          cupsOpts.Duplex = duplexMap[params.duplex] || "None";
+        }
+        if (params.paper_size) cupsOpts.PageSize = params.paper_size;
+        if (params.color_mode) cupsOpts.ColorModel = params.color_mode === "monochrome" ? "Gray" : "CMYK";
+        if (params.orientation) cupsOpts["orientation-requested"] = params.orientation === "landscape" ? "4" : "3";
+        if (params.page_ranges) cupsOpts["page-ranges"] = params.page_ranges;
+        if (params.fit_to_page) cupsOpts["fit-to-page"] = "true";
+
+        const result = await processAndPrint(fileData.base64, fileData.filename, options);
+
+        // Clean up uploaded file after printing
+        await upload.deleteFile(params.file_id);
+
+        if (!result.success) return err(result.message);
+        return ok(result);
+      } catch (e) { return err(`Error: ${(e as Error).message}`); }
+    }
+  );
+
+  // ═══ 13. list_uploads ═════════════════════════════════════
+
+  server.registerTool(
+    "list_uploads",
+    {
+      title: "List uploaded files",
+      description: "Show files uploaded via /upload endpoint that are available for print_uploaded.",
+      inputSchema: ListUploadsInputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      const files = upload.listFiles();
+      if (files.length === 0) {
+        return ok("No uploaded files. Upload via: curl -sF 'file=@path' https://printer-mcp.appserver.tokyo/upload?key=KEY");
+      }
+      return ok(files.map(f => ({
+        file_id: f.file_id,
+        filename: f.filename,
+        size: f.size,
+        age_seconds: Math.round((Date.now() - f.uploaded_at) / 1000),
+      })));
     }
   );
 }
