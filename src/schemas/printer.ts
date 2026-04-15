@@ -1,89 +1,92 @@
 import { z } from "zod";
 
-// ─── Printer hardware reference (baked from real device) ────
+// ─── Printer hardware reference (baked from real device PPD) ─
 // Kyocera TASKalfa 6054ci + DF-7150 + Punch + Folding + Inserter
-const CUPS_OPTIONS_DESC = `Raw CUPS/PPD options as key-value pairs. These override named params (duplex, paper_size, etc).
+const CUPS_OPTIONS_DESC = `Raw CUPS/PPD options. These override named params (duplex, paper_size, etc).
 
 === INSTALLED HARDWARE ===
-Printer: Kyocera TASKalfa 6054ci
-Finisher: DF-7150 (staple/punch/fold/booklet capable)
-Punch unit: Installed (2-hole/3-hole/4-hole)
-Folding unit: Installed (bi-fold/tri-fold/engineering fold)
-Inserter: Installed (2 trays)
-Paper feeders: 4 cassettes (PF730A-D) + Multi-purpose tray (MF1)
+Printer: Kyocera TASKalfa 6054ci (socket://192.168.70.116:9100)
+Finisher: DF-7150, Punch unit, Folding unit, Inserter (2 tray)
+Paper feeders: Cassette 1-4 (PF730A-D) + Multi-purpose tray (MF1)
 
-=== KEY OPTIONS AND VALID VALUES ===
+=== OPTIONS QUICK REFERENCE ===
 
 Staple (Stpl): None | Center | Front | Rear
-  - Center = saddle-stitch (center 2-point, for booklet)
-  - Front = top-left corner
-  - Rear = top-right corner
+  Center=中綴じ用 Front=左上 Rear=右上
+  → 必ずScnt=Allも設定すること
+  → 使えない紙サイズ: A5,A6,B6,封筒,SRA3,Executive,ISOB5,Statement,Folio
+  → 使えない紙種類: Cardstock,Envelope,Labels,Rough,Transparency
 
 Staple grouping (Scnt): None | All | Each2..Each100
-  - All = staple entire job as one set
-  - EachN = staple every N pages as separate sets
 
-Punch (Pnch): None | 2Hole | 2HoleEUR | 3Hole | 4Hole
+Punch (Pnch): None | 2Hole | 3Hole | 4Hole
+  → 使えない紙サイズ: A6,B6,封筒,Executive,ISOB5,SRA3,OficioII,OficioMX
+  → 使えない紙種類: Cardstock,Envelope,Labels,Prepunched,Transparency
 
-Booklet (KCBooklet): None | Left | Right
-  - Left = left-edge binding
-  - Right = right-edge binding
-  - Combine with Fold=True for folded booklet
+中綴じ製本 (KCBooklet): None | Left | Right
+  → 使える紙サイズ: A4, A5, B5, Letter, P16K のみ（A3,B4,Legal,Tabloid等は不可）
+  → Stplと同時指定不可（中綴じは内部で自動ステープル）
+  → Fold=True で折りを追加
 
-Booklet fold (Fold): False | True
-  - Only used with KCBooklet. Folds the booklet in half.
+製本折り (Fold): False | True → KCBookletと併用のみ
 
-Folding mode (FldA): None | Bifold | Trifold | Zfold | EngrFold
-Folding side (FldB): None | FPInside | FPOutside
-Bi-fold side (BiFldB): None | FPInside | FPOutside
-Folding direction (FldC): None | RIGHTL | LEFTR
-Folding method (FldD): None | FLD1..FLD5
-Z-fold direction (ZFldC): None | RIGHTL | LEFTR
-Z-fold method (ZFldD): None | FLD1..FLD5
+折りモード (FldA): None | Bifold | Trifold | Zfold | EngrFold
+  Bifold(二つ折り):
+    → 使えるサイズ: A3,A4,B4,B5,Letter,Legal,Tabloid,SRA3,P12X18,OficioII,P8K
+    → A5以下は不可
+  Trifold(三つ折り):
+    → 使えるサイズ: A3,A4,Letter,Legal,Tabloid のみ（B4,B5も不可）
+  → 全折りで不可な紙種類: Cardstock,Envelope,Labels,Rough,Thick,Transparency,Vellum,Letterhead,Preprinted
+  → OutputBin=FLDTRAY を必ず設定
 
-Paper size (PageSize): A4 | A3 | A5 | A6 | B4 | B5 | Letter | Legal | Tabloid | SRA3 | etc
-Paper source (InputSlot): Auto | PF730A | PF730B | PF730C | PF730D | MF1 | ST11
-  - PF730A-D = Cassette 1-4
-  - MF1 = Multi-purpose tray
-  - ST11 = Side tray
-Paper type (MediaType): PrnDef | Auto | Plain | Transparency | Labels | Letterhead | Bond | Color | Preprinted | Prepunched | Recycled | Cardstock | Vellum | Envelope | Rough | Thick | CoatedPaper | Highqlty
+折り面 (FldB/BiFldB): None | FPInside | FPOutside
+折り方向 (FldC/ZFldC): None | RIGHTL | LEFTR
+折り方法 (FldD/ZFldD/BFpS): None | FLD1..FLD5
 
-Duplex (Duplex): None | DuplexTumble | DuplexNoTumble
-  - None = one-sided
-  - DuplexNoTumble = two-sided long-edge (default for duplex)
-  - DuplexTumble = two-sided short-edge (flip on short edge)
+用紙サイズ (PageSize): A4 | A3 | A5 | A6 | B4 | B5 | Letter | Legal | Tabloid | SRA3 等
+給紙トレイ (InputSlot): Auto | PF730A | PF730B | PF730C | PF730D | MF1 | ST11
+  PF730A-D=カセット1-4, MF1=手差し, ST11=サイドトレイ
+  ⚠ 印刷前に get_printer_status でトレイの紙設定を確認すること
+用紙種類 (MediaType): PrnDef | Auto | Plain | Thick | Cardstock | Envelope | Labels 等
+両面 (Duplex): None | DuplexNoTumble(長辺) | DuplexTumble(短辺)
+カラー (ColorModel): CMYK | Gray
+排紙先 (OutputBin): None | INNERTRAY | LFTTRAYDWN | SEPARATORTRAY | FDStackerA/B | FLDTRAY | MBDWN01-07
 
-Color (ColorModel): CMYK | Gray
+=== よくある組み合わせ ===
+A4両面+左上ステープル+パンチ: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole","Duplex":"DuplexNoTumble","PageSize":"A4"}
+A4中綴じ製本(折り付き): {"KCBooklet":"Left","Fold":"True","PageSize":"A4"}
+A4三つ折り: {"FldA":"Trifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A4"}
+A3二つ折り: {"FldA":"Bifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A3"}
+厚紙カセット2から: {"InputSlot":"PF730B","MediaType":"Thick","PageSize":"A4"}
 
-Output bin (OutputBin): None | INNERTRAY | LFTTRAYDWN | SEPARATORTRAY | FDStackerA | FDStackerB | FLDTRAY | MBDWN01..MBDWN07
-  - FLDTRAY = folding unit output tray
-  - MBDWN01-07 = mailbox bins
-
-=== COMMON COMBINATIONS ===
-Staple top-left: {"Stpl":"Front","Scnt":"All"}
-Staple + 2-hole punch: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole"}
-Booklet (folded, left-bind): {"KCBooklet":"Left","Fold":"True","Stpl":"Center","Scnt":"All"}
-Tri-fold letter: {"FldA":"Trifold","FldB":"FPInside","OutputBin":"FLDTRAY"}
-Two-sided A3 color: {"PageSize":"A3","Duplex":"DuplexNoTumble","ColorModel":"CMYK"}
-Thick paper from tray 2: {"InputSlot":"PF730B","MediaType":"Thick"}`;
+=== 重要な制約まとめ ===
+1. KCBooklet(中綴じ)とStpl(ステープル)は同時指定不可。中綴じは自動ステープル。
+2. 折り(FldA)使用時はOutputBin=FLDTRAY必須。
+3. A5以下の小さい紙はステープル/折り/中綴じすべて不可。
+4. 封筒/ラベル/OHPはステープル/パンチ/折りすべて不可。
+5. 厚紙(Cardstock/Thick)はステープル/パンチ/折りすべて不可。
+6. 中綴じ製本はA4/A5/B5/Letterのみ対応。A3/B4/Legal不可。
+7. 三つ折りはA3/A4/Letter/Legal/Tabloidのみ。B4/B5も不可。
+8. validate_print_options で事前に必ず検証すること。
+9. get_printer_status でトレイの紙サイズ・紙種類を確認してから印刷すること。`;
 
 export const PrintDocumentInputSchema = z.object({
   document_base64: z.string().min(1).describe("Base64-encoded document content"),
   filename: z.string().min(1).max(255).describe("Original filename with extension (e.g. 'report.pdf', 'slides.pptx')"),
   printer: z.string().optional().describe("Printer name. Default: TASKalfa-6054ci"),
   copies: z.number().int().min(1).max(999).default(1).describe("Number of copies"),
-  duplex: z.enum(["one-sided", "two-sided-long-edge", "two-sided-short-edge"]).optional().describe("Duplex mode (shorthand; cups_options Duplex takes priority)"),
-  paper_size: z.string().optional().describe("Paper size shorthand: A4, A3, Letter, etc"),
-  color_mode: z.enum(["color", "monochrome"]).optional().describe("Color shorthand"),
-  orientation: z.enum(["portrait", "landscape"]).optional().describe("Orientation"),
-  page_ranges: z.string().optional().describe("Page range: '1-5', '2,4,6'"),
-  fit_to_page: z.boolean().default(false).describe("Scale to fit paper"),
+  duplex: z.enum(["one-sided", "two-sided-long-edge", "two-sided-short-edge"]).optional(),
+  paper_size: z.string().optional().describe("A4, A3, Letter, etc"),
+  color_mode: z.enum(["color", "monochrome"]).optional(),
+  orientation: z.enum(["portrait", "landscape"]).optional(),
+  page_ranges: z.string().optional().describe("'1-5', '2,4,6'"),
+  fit_to_page: z.boolean().default(false),
   cups_options: z.record(z.string(), z.string()).optional().describe(CUPS_OPTIONS_DESC),
 }).strict();
 export type PrintDocumentInput = z.infer<typeof PrintDocumentInputSchema>;
 
 export const ValidatePrintOptionsInputSchema = z.object({
-  cups_options: z.record(z.string(), z.string()).describe("Options to validate. Same key-value format as print_document's cups_options."),
+  cups_options: z.record(z.string(), z.string()).describe("Options to validate (same format as print_document cups_options)"),
   printer: z.string().optional().describe("Printer name. Default: TASKalfa-6054ci"),
 }).strict();
 export type ValidatePrintOptionsInput = z.infer<typeof ValidatePrintOptionsInputSchema>;
@@ -103,8 +106,8 @@ export const GetPrinterCapabilitiesInputSchema = z.object({
 export type GetPrinterCapabilitiesInput = z.infer<typeof GetPrinterCapabilitiesInputSchema>;
 
 export const GetPrintJobsInputSchema = z.object({
-  printer: z.string().optional().describe("Filter by printer name"),
-  completed: z.boolean().default(false).describe("Include completed jobs"),
+  printer: z.string().optional(),
+  completed: z.boolean().default(false),
 }).strict();
 export type GetPrintJobsInput = z.infer<typeof GetPrintJobsInputSchema>;
 
@@ -114,20 +117,20 @@ export const GetJobStatusInputSchema = z.object({
 export type GetJobStatusInput = z.infer<typeof GetJobStatusInputSchema>;
 
 export const CancelPrintJobInputSchema = z.object({
-  job_id: z.string().min(1).describe("Job ID to cancel"),
+  job_id: z.string().min(1),
 }).strict();
 export type CancelPrintJobInput = z.infer<typeof CancelPrintJobInputSchema>;
 
 export const ConvertToPdfInputSchema = z.object({
-  document_base64: z.string().min(1).describe("Base64-encoded Office document"),
+  document_base64: z.string().min(1),
   filename: z.string().min(1).max(255).describe("Filename with extension (e.g. 'report.docx')"),
 }).strict();
 export type ConvertToPdfInput = z.infer<typeof ConvertToPdfInputSchema>;
 
 export const PrintUrlInputSchema = z.object({
-  url: z.string().url().describe("URL to download and print"),
-  filename: z.string().min(1).max(255).describe("Filename for format detection (e.g. 'report.pdf')"),
-  printer: z.string().optional().describe("Printer name"),
+  url: z.string().url(),
+  filename: z.string().min(1).max(255).describe("Filename for format detection"),
+  printer: z.string().optional(),
   copies: z.number().int().min(1).max(999).default(1),
   cups_options: z.record(z.string(), z.string()).optional().describe("Same as print_document cups_options"),
 }).strict();

@@ -103,17 +103,17 @@ export function registerPrinterTools(server: McpServer): void {
     "print_document",
     {
       title: "Print document",
-      description: `Print a document to Kyocera TASKalfa 6054ci (DF-7150 finisher installed).
+      description: `Print to Kyocera TASKalfa 6054ci (DF-7150 finisher).
+PDF/images/text → direct. Office (DOCX/XLSX/PPTX) → auto-converted via Graph API.
 
-SUPPORTED FILES: PDF, images (JPG/PNG/TIFF), text → direct print. Office files (DOCX/XLSX/PPTX) → auto-converted to PDF via Graph API.
+REQUIRED WORKFLOW for finisher options:
+  1. get_printer_status → confirm printer is idle + check tray paper settings
+  2. Build cups_options using the reference in the parameter description
+  3. validate_print_options → verify option compatibility (3192 PPD rules)
+  4. print_document → send to printer
+  5. get_job_status → confirm completion
 
-WORKFLOW for finisher options:
-  1. Build cups_options from the reference in the parameter description
-  2. Call validate_print_options to verify the options are valid
-  3. Call print_document with the verified options
-  4. Call get_job_status to confirm completion
-
-cups_options parameter contains full hardware reference with all valid values and common combinations.`,
+cups_options description contains: all valid values, paper/media constraints, common combinations, and the 9 critical rules.`,
       inputSchema: PrintDocumentInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
