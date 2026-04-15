@@ -8,9 +8,10 @@ WORKFLOW: get_printer_status → build options → validate_print_options → pr
 KEY OPTIONS:
   Stpl: Front(左下1箇所)|Rear(左上1箇所)|DualLeft(左辺2箇所)|TopRight(右上1箇所)|DualRight(右辺2箇所)|DualTop(上辺2箇所)|Center(=DualLeft) + Scnt:All必須. Max100枚. A5以下/封筒/厚紙不可
   Pnch: 2Hole|3Hole|4Hole. A6以下/封筒/厚紙不可
-  KCBooklet: Left(横書き)|Right(縦書き) + Fold:True. PageSize=仕上がりサイズ(A4→A3紙自動). Max20枚(80p),60-90gsm. Stplと同時不可
+  KCBooklet: Left(横書き)|Right(縦書き) + Fold:True. PageSize=仕上がりサイズ(A4→A3紙自動). Max20枚(80p),60-90gsm. Stplと同時不可. orientation-requested=4で横向き中綴じ(上下見開き)可
   FldA: Bifold(A3-B5)|Trifold(A4/Letterのみ) + FldB:FPInside|FPOutside + OutputBin:FLDTRAY必須. Max3枚,普通紙のみ
   Duplex: DuplexNoTumble(長辺)|DuplexTumble(短辺)
+  orientation-requested: 3(タテ)|4(ヨコ). KCBookletと併用で横向き中綴じ(上下見開き冊子)
   number-up: 2|4|6|9|16 (1枚にNページ面付け). KCBookletと併用可(面付け後に製本)
   number-up-layout: lrtb(左→右,上→下,標準)|rltb(右→左,縦書き向け)|tblr|btlr|btrl|lrbt|rlbt|tbrl
   PageSize: A4|A3|A5|B4|B5|Letter|Legal|Tabloid等
@@ -20,14 +21,11 @@ KEY OPTIONS:
   OutputBin: None|INNERTRAY|FLDTRAY(折り用)等
 
 COMMON:
-  A4両面+左上1箇所ステープル+パンチ: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole","Duplex":"DuplexNoTumble","PageSize":"A4"}
+  A4両面+左下1箇所ステープル+パンチ: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole","Duplex":"DuplexNoTumble","PageSize":"A4"}
   A4両面+左辺2箇所ステープル: {"Stpl":"DualLeft","Scnt":"All","Duplex":"DuplexNoTumble","PageSize":"A4"}
-  A4中綴じ左綴じ: {"KCBooklet":"Left","Fold":"True","PageSize":"A4"}
+  A4中綴じ左綴じ(タテ): {"KCBooklet":"Left","Fold":"True","PageSize":"A4"}
+  A4中綴じ横向き(上下見開き): {"KCBooklet":"Left","Fold":"True","PageSize":"A4","orientation-requested":"4"}
   A4三つ折り: {"FldA":"Trifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A4"}
-  A4に4ページ面付け: {"number-up":"4","number-up-layout":"lrtb","PageSize":"A4"}
-  2ページ面付け+両面+ステープル(紙節約): {"number-up":"2","Duplex":"DuplexNoTumble","Stpl":"Front","Scnt":"All","PageSize":"A4"}
-  4ページ面付け+両面+パンチ(配布資料): {"number-up":"4","number-up-layout":"lrtb","Duplex":"DuplexNoTumble","Pnch":"2Hole","PageSize":"A4"}
-  A3に2ページ面付け+二つ折り(リーフレット): {"number-up":"2","FldA":"Bifold","BiFldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A3"}
   横長PPTX→A4縦2up→中綴じ製本: {"number-up":"2","KCBooklet":"Left","Fold":"True","PageSize":"A4"}`;
 
 export const ValidatePrintOptionsInputSchema = z.object({
