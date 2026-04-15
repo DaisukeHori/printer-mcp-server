@@ -3,7 +3,8 @@ import { z } from "zod";
 // ─── Compact reference (detailed info via get_printer_capabilities) ─
 const CUPS_OPTIONS_DESC = `CUPS/PPD options. Use validate_print_options BEFORE printing.
 
-WORKFLOW: get_printer_status → build options → validate_print_options → print_document → get_job_status
+WORKFLOW: get_printer_status → build options → validate_print_options → print_uploaded → get_job_status
+Supports 70 file formats: PDF/image direct, HEIC/PSD/AI/RAW via ImageMagick, MD/HTML/DXF via pandoc/wkhtmltopdf/ezdxf, Office via Graph API.
 
 KEY OPTIONS:
   Stpl: Front(左下1箇所)|Rear(左上1箇所)|DualLeft(左辺2箇所)|TopRight(右上1箇所)|DualRight(右辺2箇所)|DualTop(上辺2箇所)|Center(=DualLeft) + Scnt:All必須. Max100枚. A5以下/封筒/厚紙不可
