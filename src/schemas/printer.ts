@@ -11,7 +11,7 @@ KEY OPTIONS:
   KCBooklet: Left(横書き)|Right(縦書き) + Fold:True. PageSize=仕上がりサイズ(A4→A3紙自動). Max20枚(80p),60-90gsm. Stplと同時不可
   FldA: Bifold(A3-B5)|Trifold(A4/Letterのみ) + FldB:FPInside|FPOutside + OutputBin:FLDTRAY必須. Max3枚,普通紙のみ
   Duplex: DuplexNoTumble(長辺)|DuplexTumble(短辺)
-  number-up: 2|4|6|9|16 (1枚にNページ面付け). KCBookletと同時不可
+  number-up: 2|4|6|9|16 (1枚にNページ面付け). KCBookletと併用可(面付け後に製本)
   number-up-layout: lrtb(左→右,上→下,標準)|rltb(右→左,縦書き向け)|tblr|btlr|btrl|lrbt|rlbt|tbrl
   PageSize: A4|A3|A5|B4|B5|Letter|Legal|Tabloid等
   InputSlot: Auto|PF730A-D(カセット1-4)|MF1(手差し)
@@ -26,7 +26,8 @@ COMMON:
   A4に4ページ面付け: {"number-up":"4","number-up-layout":"lrtb","PageSize":"A4"}
   2ページ面付け+両面+ステープル(紙節約): {"number-up":"2","Duplex":"DuplexNoTumble","Stpl":"Front","Scnt":"All","PageSize":"A4"}
   4ページ面付け+両面+パンチ(配布資料): {"number-up":"4","number-up-layout":"lrtb","Duplex":"DuplexNoTumble","Pnch":"2Hole","PageSize":"A4"}
-  A3に2ページ面付け+二つ折り(リーフレット): {"number-up":"2","FldA":"Bifold","BiFldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A3"}`;
+  A3に2ページ面付け+二つ折り(リーフレット): {"number-up":"2","FldA":"Bifold","BiFldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A3"}
+  横長PPTX→A4縦2up→中綴じ製本: {"number-up":"2","KCBooklet":"Left","Fold":"True","PageSize":"A4"}`;
 
 export const ValidatePrintOptionsInputSchema = z.object({
   cups_options: z.record(z.string(), z.string()).describe("Options to validate before printing"),

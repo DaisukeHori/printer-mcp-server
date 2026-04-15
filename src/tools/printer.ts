@@ -281,6 +281,13 @@ Example: validate_print_options(cups_options: {"KCBooklet":"Left","Fold":"True",
         const caps = await cups.getPrinterCapabilities(printer);
 
         // ── Step 1: Value validation ──
+        // CUPS built-in options (not in PPD but valid)
+        const cupsBuiltins = new Set([
+          "number-up", "number-up-layout", "page-ranges", "fit-to-page",
+          "orientation-requested", "media", "sides", "print-quality",
+          "print-color-mode", "output-order", "page-border",
+        ]);
+
         const validOptions = new Map<string, Set<string>>();
         for (const cap of caps) {
           validOptions.set(cap.option, new Set(cap.choices));
@@ -290,7 +297,11 @@ Example: validate_print_options(cups_options: {"KCBooklet":"Left","Fold":"True",
         for (const [key, value] of Object.entries(params.cups_options)) {
           const validValues = validOptions.get(key);
           if (!validValues) {
-            valueResults.push({ option: key, value, valid: false, reason: `Unknown option "${key}"` });
+            if (cupsBuiltins.has(key)) {
+              valueResults.push({ option: key, value, valid: true, reason: "CUPS built-in (not in PPD, but valid)" });
+            } else {
+              valueResults.push({ option: key, value, valid: false, reason: `Unknown option "${key}"` });
+            }
           } else if (!validValues.has(value)) {
             valueResults.push({ option: key, value, valid: false, reason: `Invalid value. Valid: ${[...validValues].join(", ")}` });
           } else {
