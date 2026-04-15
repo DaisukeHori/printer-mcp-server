@@ -6,7 +6,7 @@ const CUPS_OPTIONS_DESC = `CUPS/PPD options. Use validate_print_options BEFORE p
 WORKFLOW: get_printer_status → build options → validate_print_options → print_document → get_job_status
 
 KEY OPTIONS:
-  Stpl: Front(左上)|Rear(右上) + Scnt:All必須. Max100枚. A5以下/封筒/厚紙不可
+  Stpl: Front(左上1箇所)|Rear(右上1箇所)|DualLeft(左辺2箇所)|Center(左辺2箇所,DualLeftと同じ) + Scnt:All必須. Max100枚. A5以下/封筒/厚紙不可
   Pnch: 2Hole|3Hole|4Hole. A6以下/封筒/厚紙不可
   KCBooklet: Left(横書き)|Right(縦書き) + Fold:True. PageSize=仕上がりサイズ(A4→A3紙自動). Max20枚(80p),60-90gsm. Stplと同時不可
   FldA: Bifold(A3-B5)|Trifold(A4/Letterのみ) + FldB:FPInside|FPOutside + OutputBin:FLDTRAY必須. Max3枚,普通紙のみ
@@ -20,7 +20,8 @@ KEY OPTIONS:
   OutputBin: None|INNERTRAY|FLDTRAY(折り用)等
 
 COMMON:
-  A4両面+ステープル+パンチ: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole","Duplex":"DuplexNoTumble","PageSize":"A4"}
+  A4両面+左上1箇所ステープル+パンチ: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole","Duplex":"DuplexNoTumble","PageSize":"A4"}
+  A4両面+左辺2箇所ステープル: {"Stpl":"DualLeft","Scnt":"All","Duplex":"DuplexNoTumble","PageSize":"A4"}
   A4中綴じ左綴じ: {"KCBooklet":"Left","Fold":"True","PageSize":"A4"}
   A4三つ折り: {"FldA":"Trifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A4"}
   A4に4ページ面付け: {"number-up":"4","number-up-layout":"lrtb","PageSize":"A4"}
