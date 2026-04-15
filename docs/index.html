@@ -4,373 +4,284 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>printer-mcp-server — AIに「印刷して」と言うだけ</title>
-<meta name="description" content="Kyocera TASKalfa 6054ciをMCP化。11ツール、Office自動変換、3192件PPD制約バリデーション、フィニッシャー完全制御。">
-<meta name="author" content="Daisuke Hori">
-<meta property="og:title" content="printer-mcp-server — 11 MCP Tools">
-<meta property="og:description" content="AIに「印刷して」と言うだけ。ステープル・パンチ・中綴じ・折りをAIが自動制御。3192件のPPD制約バリデーション付き。">
-<meta property="og:locale" content="ja_JP">
-<meta property="og:type" content="website">
+<meta name="description" content="Kyocera TASKalfa 6054ciをMCP化。11ツール、ゼロトークン印刷、Office自動変換、3192件PPD制約バリデーション。">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#060b18;--surface:#0d1525;--surface2:#131d32;--surface3:#192640;
-  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
-  --cyan:#06b6d4;--cyan2:#0891b2;--cyan-glow:rgba(6,182,212,.12);
-  --blue:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--orange:#f97316;
-  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.1);
-  --mono:'JetBrains Mono',monospace;--sans:'Noto Sans JP',system-ui,sans-serif;
-  --radius:12px;--max:1120px;
-}
-html{scroll-behavior:smooth}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.75;-webkit-font-smoothing:antialiased}
-a{color:var(--cyan);text-decoration:none;transition:color .2s}
-a:hover{color:#22d3ee;text-decoration:underline}
-code{font-family:var(--mono);font-size:.85em;background:var(--surface2);padding:.15em .4em;border-radius:4px}
+:root{--bg:#060b18;--sf:#0d1525;--sf2:#131d32;--tx:#e2e8f0;--tx2:#94a3b8;--tx3:#64748b;--cy:#06b6d4;--cy-g:rgba(6,182,212,.12);--bl:#3b82f6;--gn:#22c55e;--rd:#ef4444;--yl:#eab308;--bd:rgba(255,255,255,.06);--mono:'JetBrains Mono',monospace;--sans:'Noto Sans JP',system-ui,sans-serif;--r:12px;--mx:1120px}
+html{scroll-behavior:smooth}body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cy);text-decoration:none}a:hover{color:#22d3ee}code{font-family:var(--mono);font-size:.85em;background:var(--sf2);padding:.15em .4em;border-radius:4px}
 
-/* ─ Nav ─ */
-.nav{position:sticky;top:0;z-index:100;background:rgba(6,11,24,.88);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:.7rem 0}
-.nav__inner{max-width:var(--max);margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;gap:2rem}
-.nav__brand{font-family:var(--mono);font-weight:700;font-size:.95rem;color:var(--text);display:flex;align-items:center;gap:.4rem;white-space:nowrap}
-.nav__brand svg{width:22px;height:22px;opacity:.7}
-.nav__links{display:flex;gap:1.2rem;list-style:none;font-size:.8rem;margin-left:auto}
-.nav__links a{color:var(--text3);transition:color .2s}
-.nav__links a:hover{color:var(--cyan);text-decoration:none}
-.dot{display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;color:var(--green);padding:.2rem .6rem;border-radius:12px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2)}
-.dot::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+.nav{position:sticky;top:0;z-index:100;background:rgba(6,11,24,.88);backdrop-filter:blur(16px);border-bottom:1px solid var(--bd);padding:.7rem 0}
+.nav__i{max-width:var(--mx);margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;gap:2rem}
+.nav__b{font-family:var(--mono);font-weight:700;font-size:.95rem;color:var(--tx);display:flex;align-items:center;gap:.4rem}
+.nav__b svg{width:22px;height:22px;opacity:.7}
+.nav__l{display:flex;gap:1.2rem;list-style:none;font-size:.8rem;margin-left:auto}
+.nav__l a{color:var(--tx3)}
+.dot{font-size:.7rem;color:var(--gn);padding:.2rem .6rem;border-radius:12px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);display:flex;align-items:center;gap:.3rem}
+.dot::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--gn);animation:blink 2s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 
-/* ─ Sections ─ */
-.wrap{max-width:var(--max);margin:0 auto;padding:0 1.5rem}
-.sec{padding:5rem 0}
-.sec--alt{background:var(--surface)}
-.sec__title{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
-.sec__sub{color:var(--text2);font-size:.9rem;margin-bottom:2.5rem;max-width:680px}
+.w{max-width:var(--mx);margin:0 auto;padding:0 1.5rem}
+.s{padding:4.5rem 0}.s--a{background:var(--sf)}
+.s__t{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
+.s__d{color:var(--tx2);font-size:.9rem;margin-bottom:2.5rem;max-width:680px}
 
-/* ─ Hero ─ */
 .hero{padding:5.5rem 1.5rem 4rem;text-align:center;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(6,182,212,.1),transparent);pointer-events:none}
-.hero__chip{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--cyan);background:var(--cyan-glow);border:1px solid rgba(6,182,212,.18);padding:.35rem .9rem;border-radius:20px;margin-bottom:1.5rem;font-family:var(--mono)}
-.hero h1{font-size:clamp(2.2rem,5.5vw,3.8rem);font-weight:900;line-height:1.15;margin-bottom:1.2rem;letter-spacing:-.02em}
-.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hero__p{font-size:1rem;color:var(--text2);max-width:680px;margin:0 auto 2.2rem;line-height:1.85}
-.hero__ep{font-family:var(--mono);font-size:.78rem;background:var(--surface);border:1px solid var(--border);padding:.55rem 1.1rem;border-radius:8px;display:inline-block;color:var(--text3)}
-.hero__ep b{color:var(--cyan)}
+.hero__chip{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--cy);background:var(--cy-g);border:1px solid rgba(6,182,212,.18);padding:.35rem .9rem;border-radius:20px;margin-bottom:1.5rem;font-family:var(--mono)}
+.hero h1{font-size:clamp(2.2rem,5.5vw,3.8rem);font-weight:900;line-height:1.15;margin-bottom:1.2rem}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--cy),var(--bl));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero__p{font-size:1rem;color:var(--tx2);max-width:700px;margin:0 auto 2.2rem;line-height:1.85}
+.hero__ep{font-family:var(--mono);font-size:.78rem;background:var(--sf);border:1px solid var(--bd);padding:.55rem 1.1rem;border-radius:8px;display:inline-block;color:var(--tx3)}
+.hero__ep b{color:var(--cy)}
 
-/* ─ Stats bar ─ */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem}
-.stat{background:var(--surface);padding:1.5rem 1rem;text-align:center}
-.stat__n{font-family:var(--mono);font-size:2rem;font-weight:800;color:var(--cyan)}
-.stat__l{font-size:.72rem;color:var(--text3);margin-top:.2rem}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bd);border-radius:var(--r);overflow:hidden}
+.stat{background:var(--sf);padding:1.5rem 1rem;text-align:center}
+.stat__n{font-family:var(--mono);font-size:2rem;font-weight:800;color:var(--cy)}
+.stat__l{font-size:.72rem;color:var(--tx3);margin-top:.2rem}
 
-/* ─ Cards ─ */
-.grid{display:grid;gap:1rem}
-.grid--2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
-.grid--3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.grid--4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.4rem;transition:border-color .3s,transform .3s}
-.card:hover{border-color:rgba(6,182,212,.25);transform:translateY(-2px)}
-.card__ico{font-size:1.4rem;margin-bottom:.7rem}
-.card__h{font-weight:700;font-size:.95rem;margin-bottom:.4rem}
-.card__p{color:var(--text2);font-size:.82rem;line-height:1.7}
-.card__tag{display:inline-block;font-size:.65rem;padding:.1rem .4rem;border-radius:3px;font-family:var(--mono);margin-top:.5rem}
-.card__tag--limit{background:rgba(234,179,8,.12);color:var(--yellow)}
-.card__tag--paper{background:rgba(6,182,212,.12);color:var(--cyan)}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+.g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+.c{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.4rem;transition:border-color .3s,transform .3s}
+.c:hover{border-color:rgba(6,182,212,.25);transform:translateY(-2px)}
+.c__i{font-size:1.4rem;margin-bottom:.7rem}
+.c__h{font-weight:700;font-size:.95rem;margin-bottom:.4rem}
+.c__p{color:var(--tx2);font-size:.82rem;line-height:1.7}
+.c__tag{display:inline-block;font-size:.65rem;padding:.1rem .4rem;border-radius:3px;font-family:var(--mono);margin-top:.5rem}
+.c__tag--y{background:rgba(234,179,8,.12);color:var(--yl)}
+.c__tag--c{background:rgba(6,182,212,.12);color:var(--cy)}
 
-/* ─ Code ─ */
-.pre{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.3rem;font-family:var(--mono);font-size:.78rem;line-height:1.9;overflow-x:auto;color:var(--text2);margin:1rem 0}
-.pre .c{color:var(--text3)}.pre .k{color:var(--cyan)}.pre .v{color:var(--yellow)}.pre .g{color:var(--green)}.pre .r{color:var(--red)}
+.pre{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:1.1rem 1.3rem;font-family:var(--mono);font-size:.78rem;line-height:1.9;overflow-x:auto;color:var(--tx2);margin:1rem 0}
+.pre .c_{color:var(--tx3)}.pre .k{color:var(--cy)}.pre .v{color:var(--yl)}.pre .g_{color:var(--gn)}
 
-/* ─ Tools table ─ */
 .tbl{width:100%;border-collapse:collapse;font-size:.82rem}
-.tbl th{text-align:left;padding:.55rem .7rem;color:var(--text3);font-weight:500;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border2)}
-.tbl td{padding:.55rem .7rem;border-bottom:1px solid var(--border)}
+.tbl th{text-align:left;padding:.55rem .7rem;color:var(--tx3);font-weight:500;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,.1)}
+.tbl td{padding:.55rem .7rem;border-bottom:1px solid var(--bd)}
 .tbl tr:hover td{background:rgba(255,255,255,.015)}
-.tag{font-size:.6rem;padding:.12rem .35rem;border-radius:3px;font-family:var(--mono);font-weight:600;letter-spacing:.02em}
-.tag-w{background:rgba(59,130,246,.15);color:var(--blue)}.tag-r{background:rgba(34,197,94,.15);color:var(--green)}.tag-d{background:rgba(239,68,68,.15);color:var(--red)}
+.tag{font-size:.6rem;padding:.12rem .35rem;border-radius:3px;font-family:var(--mono);font-weight:600}
+.tag-w{background:rgba(59,130,246,.15);color:var(--bl)}.tag-r{background:rgba(34,197,94,.15);color:var(--gn)}.tag-d{background:rgba(239,68,68,.15);color:var(--rd)}
 
-/* ─ Constraint demo ─ */
-.cst{background:var(--surface);border-radius:var(--radius);padding:1rem 1.2rem;margin:.6rem 0;border-left:3px solid var(--red);font-size:.82rem}
-.cst--ok{border-left-color:var(--green)}
-.cst__h{font-weight:700;margin-bottom:.2rem;display:flex;align-items:center;gap:.3rem}
-.cst__m{color:var(--text2)}
+.cst{background:var(--sf);border-radius:var(--r);padding:1rem 1.2rem;margin:.6rem 0;border-left:3px solid var(--rd);font-size:.82rem}
+.cst--ok{border-left-color:var(--gn)}
+.cst__h{font-weight:700;margin-bottom:.2rem}
+.cst__m{color:var(--tx2)}
 
-/* ─ Flow ─ */
-.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;text-align:center;margin:2rem 0}
-.flow__step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem .5rem;font-size:.75rem}
-.flow__n{font-family:var(--mono);font-weight:700;color:var(--cyan);font-size:1.1rem;margin-bottom:.3rem}
-.flow__arrow{color:var(--text3);display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.4rem;text-align:center;margin:2rem 0}
+.flow__s{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:.8rem .4rem;font-size:.72rem}
+.flow__n{font-family:var(--mono);font-weight:700;color:var(--cy);font-size:1rem;margin-bottom:.2rem}
 
-/* ─ Setup steps ─ */
-.steps{counter-reset:step}
-.step{counter-increment:step;position:relative;padding-left:3.5rem;margin-bottom:2rem}
-.step::before{content:counter(step);position:absolute;left:0;top:0;width:2.2rem;height:2.2rem;background:var(--surface2);border:1px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.85rem;color:var(--cyan)}
+.steps{counter-reset:step}.step{counter-increment:step;position:relative;padding-left:3.5rem;margin-bottom:2rem}
+.step::before{content:counter(step);position:absolute;left:0;top:0;width:2.2rem;height:2.2rem;background:var(--sf2);border:1px solid rgba(255,255,255,.1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.85rem;color:var(--cy)}
 .step__h{font-weight:700;font-size:1rem;margin-bottom:.3rem}
-.step__p{color:var(--text2);font-size:.85rem;line-height:1.8}
+.step__p{color:var(--tx2);font-size:.85rem;line-height:1.8}
 
-/* ─ Footer ─ */
-.footer{text-align:center;padding:3rem 1.5rem;color:var(--text3);font-size:.78rem;border-top:1px solid var(--border)}
-
-@media(max-width:768px){
-  .nav__links{display:none}
-  .stats{grid-template-columns:repeat(2,1fr)}
-  .flow{grid-template-columns:1fr;gap:.3rem}
-  .flow__arrow{transform:rotate(90deg)}
-  .grid--2,.grid--3,.grid--4{grid-template-columns:1fr}
-}
+.footer{text-align:center;padding:3rem 1.5rem;color:var(--tx3);font-size:.78rem;border-top:1px solid var(--bd)}
+@media(max-width:768px){.nav__l{display:none}.stats{grid-template-columns:repeat(2,1fr)}.g2,.g3,.g4{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
 
-<!-- Nav -->
-<nav class="nav"><div class="nav__inner">
-  <span class="nav__brand">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="6" y1="7" x2="18" y2="7"/><line x1="6" y1="15" x2="18" y2="15"/><rect x="10" y="17" width="4" height="2" rx=".5" fill="currentColor"/></svg>
-    printer-mcp-server
-  </span>
-  <ul class="nav__links">
-    <li><a href="#arch">構成</a></li>
-    <li><a href="#hw">ハードウェア</a></li>
-    <li><a href="#tools">ツール</a></li>
-    <li><a href="#finisher">フィニッシャー</a></li>
-    <li><a href="#validation">バリデーション</a></li>
-    <li><a href="#setup">セットアップ</a></li>
-    <li><a href="https://github.com/DaisukeHori/printer-mcp-server" target="_blank">GitHub</a></li>
-  </ul>
+<nav class="nav"><div class="nav__i">
+  <span class="nav__b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="6" y1="7" x2="18" y2="7"/><line x1="6" y1="15" x2="18" y2="15"/><rect x="10" y="17" width="4" height="2" rx=".5" fill="currentColor"/></svg>printer-mcp</span>
+  <ul class="nav__l"><li><a href="#zero">ゼロトークン</a></li><li><a href="#tools">ツール</a></li><li><a href="#finisher">フィニッシャー</a></li><li><a href="#validation">バリデーション</a></li><li><a href="#setup">セットアップ</a></li><li><a href="https://github.com/DaisukeHori/printer-mcp-server" target="_blank">GitHub</a></li></ul>
   <span class="dot">Operational</span>
 </div></nav>
 
-<!-- Hero -->
 <section class="hero">
-  <div class="hero__chip">🖨 11 MCP Tools · 3,192 PPD Rules · Office Auto-Convert</div>
+  <div class="hero__chip">🖨 11 Tools · Zero-Token Printing · 3,192 PPD Rules · Office Auto-Convert</div>
   <h1>AIに<em>「印刷して」</em><br>と言うだけ</h1>
-  <p class="hero__p">Kyocera TASKalfa 6054ci ネットワーク複合機をMCP化。ステープル・パンチ・中綴じ製本・折りをAIが自動制御。3,192件のPPDハードウェア制約ルールで事前バリデーション。Office文書はGraph APIで自動PDF変換。</p>
+  <p class="hero__p">ファイルをアップロードして印刷指示を出すだけ。PDF・画像・Office文書、何でも同じ操作。ステープル・パンチ・中綴じ製本・折り・面付けをAIが自動制御。3,192件のPPD制約ルールで事前バリデーション。</p>
   <div class="hero__ep">Endpoint: <b>https://printer-mcp.appserver.tokyo/mcp</b></div>
 </section>
 
-<!-- Stats -->
-<section style="padding:0 1.5rem 3rem"><div class="wrap">
+<section style="padding:0 1.5rem 3rem"><div class="w">
   <div class="stats">
     <div class="stat"><div class="stat__n">11</div><div class="stat__l">MCPツール</div></div>
+    <div class="stat"><div class="stat__n">0</div><div class="stat__l">ファイル転送トークン</div></div>
     <div class="stat"><div class="stat__n">3,192</div><div class="stat__l">PPD制約ルール</div></div>
-    <div class="stat"><div class="stat__n">100枚</div><div class="stat__l">ステープル上限</div></div>
-    <div class="stat"><div class="stat__n">80p</div><div class="stat__l">中綴じ製本上限</div></div>
+    <div class="stat"><div class="stat__n">20+</div><div class="stat__l">対応ファイル形式</div></div>
   </div>
 </div></section>
 
-<!-- Demo conversation -->
-<section class="sec--alt sec"><div class="wrap">
-  <h2 class="sec__title">💬 使い方</h2>
-  <p class="sec__sub">自然言語で指示するだけ。AIがトレイ確認→制約検証→変換→印刷→完了確認まで一貫実行。</p>
+<!-- Zero Token -->
+<section class="s--a s" id="zero"><div class="w">
+  <h2 class="s__t">⚡ ゼロトークン印刷</h2>
+  <p class="s__d">ファイルをcurlで直接アップロード。base64エンコード不要。100ページのPDFでもトークン消費ゼロ。</p>
   <div class="pre">
-<span class="c">ユーザー:</span> この報告書をA4両面で左上ステープル、2穴パンチで10部印刷して
+<span class="c_"># ステップ1: bash_toolでアップロード（トークン消費ゼロ）</span>
+curl -sF <span class="v">"file=@/mnt/user-data/uploads/report.pptx"</span> <span class="k">https://printer-mcp.appserver.tokyo/upload</span>
+→ {<span class="k">"file_id"</span>:<span class="v">"abc123"</span>, <span class="k">"filename"</span>:<span class="v">"report.pptx"</span>, <span class="k">"size"</span>:2450000}
 
-<span class="c">AI:</span> get_printer_status → <span class="g">idle</span>, カセット1: A4普通紙 ✓
-    validate_print_options({Stpl:Front, Scnt:All, Pnch:2Hole, Duplex:DuplexNoTumble, PageSize:A4})
-    → <span class="g">✅ 2,134ルール検査済み、違反0</span>
-    report.docx → Graph API → <span class="k">PDF (245KB)</span>
-    print_document → <span class="k">Job #42</span> 送信: 10部, A4両面, 左上ステープル, 2穴パンチ
-    get_job_status(42) → <span class="g">✅ completed</span>
+<span class="c_"># ステップ2: MCPツールで印刷（cups_optionsの数十トークンのみ）</span>
+<span class="k">print_uploaded</span>(file_id=<span class="v">"abc123"</span>, cups_options={<span class="k">"Duplex"</span>:<span class="v">"DuplexNoTumble"</span>})
+  </div>
+  <div class="g3" style="margin-top:1.5rem">
+    <div class="c"><div class="c__i">📄</div><div class="c__h">ファイル形式を意識不要</div><div class="c__p">PDF送ろうがPPTX送ろうがDOCX送ろうが同じ操作。LXC内で拡張子を見て自動判定・変換・印刷。</div></div>
+    <div class="c"><div class="c__i">☁️</div><div class="c__h">Office自動変換</div><div class="c__p">DOCX/XLSX/PPTXはGraph API経由でPDFに自動変換。AI側は何もしなくていい。</div></div>
+    <div class="c"><div class="c__i">🗑️</div><div class="c__h">30分自動削除</div><div class="c__p">アップロードファイルは/tmp/に一時保存。印刷後または30分経過で自動削除。</div></div>
+  </div>
+</div></section>
+
+<!-- Demo -->
+<section class="s"><div class="w">
+  <h2 class="s__t">💬 使い方</h2>
+  <p class="s__d">自然言語で指示するだけ。AIがトレイ確認→アップロード→制約検証→印刷→完了確認まで一貫実行。</p>
+  <div class="pre">
+<span class="c_">ユーザー:</span> この報告書をA4両面で左上ステープル、2穴パンチで10部印刷して
+
+<span class="c_">AI:</span> get_printer_status → <span class="g_">idle</span>, カセット1: A4普通紙 ✓
+    bash_tool: curl -sF "file=@report.docx" .../upload → <span class="k">file_id: abc123</span>
+    validate_print_options → <span class="g_">✅ 2,134ルール検査、違反0</span>
+    print_uploaded(abc123, {Stpl:Front, Scnt:All, Pnch:2Hole, Duplex:NoTumble})
+    → report.docx → <span class="v">Graph API変換 → PDF</span> → CUPS → <span class="k">Job #42</span>
+    get_job_status(42) → <span class="g_">✅ completed</span>
   </div>
   <div class="pre" style="margin-top:1rem">
-<span class="c">ユーザー:</span> この企画書を中綴じ製本でA4冊子にして
+<span class="c_">ユーザー:</span> この横長スライドをA4縦に2スライドずつ配置して中綴じ製本にして
 
-<span class="c">AI:</span> get_printer_status → カセット3: A3普通紙 ✓ (中綴じA4はA3紙使用)
-    validate_print_options({KCBooklet:Left, Fold:True, PageSize:A4})
-    → <span class="g">✅ 有効</span> (20枚以内: 14枚=56p ✓)
-    proposal.pptx → Graph API → <span class="k">PDF (1.2MB)</span>
-    print_document → <span class="k">Job #43</span> A4左綴じ中綴じ製本(A3紙使用→折り→A4冊子)
-    → <span class="g">✅ completed</span>
+<span class="c_">AI:</span> bash_tool: curl -sF "file=@slides.pptx" .../upload → <span class="k">file_id: def456</span>
+    validate_print_options({number-up:2, KCBooklet:Left, Fold:True, PageSize:A4})
+    → <span class="g_">✅ 有効</span> (number-up: CUPS built-in, KCBooklet: PPD validated)
+    print_uploaded(def456, {number-up:2, KCBooklet:Left, Fold:True, PageSize:A4})
+    → PPTX → PDF → <span class="v">CUPS 2up面付け → ドライバ冊子面付け → A3紙 → 中綴じ</span> → A4冊子
   </div>
 </div></section>
 
 <!-- Architecture -->
-<section class="sec" id="arch"><div class="wrap">
-  <h2 class="sec__title">📐 アーキテクチャ</h2>
-  <p class="sec__sub">Proxmox LXC + CUPS + Kyoceraドライバ + Cloudflare Tunnel。Vercelではなく自前LXCで稼働。Office変換はGraph API経由。</p>
+<section class="s--a s"><div class="w">
+  <h2 class="s__t">📐 アーキテクチャ</h2>
+  <p class="s__d">Proxmox LXC + CUPS + Kyoceraドライバ + Cloudflare Tunnel。ファイル転送は/uploadエンドポイント（認証不要）経由。</p>
   <div class="pre">
-<span class="c">Claude.ai / Claude Desktop / Claude Code / Cursor</span>
-  ↓ <span class="k">MCP (Streamable HTTP + API Key認証)</span>
-<span class="c">Cloudflare Tunnel</span> (printer-mcp.appserver.tokyo)
+<span class="c_">Claude.ai</span>
+  ↓ bash_tool: curl -sF "file=@doc.pptx" .../upload → <span class="k">{file_id}</span>
+  ↓ MCP: <span class="k">print_uploaded</span>(file_id, cups_options)
+<span class="c_">Cloudflare Tunnel</span> (printer-mcp.appserver.tokyo)
   ↓
-┌───────────────────────────────────────────────────┐
-│ <span class="k">Proxmox LXC</span> (VMID 312, Ubuntu 24.04)             │
-│                                                    │
-│  <span class="k">printer-mcp-server</span> (Node.js 22, port 3000)       │
-│   ├── PDF/画像/テキスト → 直接CUPS                  │
-│   ├── Office(DOCX/XLSX/PPTX) → <span class="v">Graph API</span> → PDF   │
-│   └── validate → <span class="v">3,192</span> PPD制約ルール検査          │
-│                                                    │
-│  <span class="k">CUPS</span> + Kyocera UPD v10.0                        │
-│   └── socket:// → <span class="g">TASKalfa 6054ci</span> (社内LAN)      │
-└───────────────────────────────────────────────────┘
-  ↕ <span class="v">Microsoft Graph API</span> (OAuth2 Client Credentials)
-  OneDrive (一時Upload → ?format=pdf → Download → Delete)
-  </div>
-
-  <h3 style="margin:2rem 0 .75rem;font-size:1rem;font-weight:700">Office変換の優先順位</h3>
-  <div class="grid grid--3">
-    <div class="card"><div class="card__ico">🍎</div><div class="card__h">1. Mac Office (SSH)</div><div class="card__p">AppleScriptでOffice本体を操作。<strong>100%忠実</strong>変換。Mac準備後に自動切替。</div><div class="card__tag card__tag--paper">将来</div></div>
-    <div class="card" style="border-color:rgba(6,182,212,.3)"><div class="card__ico">☁️</div><div class="card__h">2. Graph API (OneDrive)</div><div class="card__p">OneDriveの?format=pdf APIで変換。<strong>98-99%</strong>再現。現在稼働中。</div><div class="card__tag card__tag--paper">現在</div></div>
-    <div class="card"><div class="card__ico">📄</div><div class="card__h">3. 直接印刷のみ</div><div class="card__p">PDF/画像/テキストのみ。Office変換なし。変換設定なしの場合。</div><div class="card__tag card__tag--limit">フォールバック</div></div>
+┌──────────────────────────────────────────────────┐
+│ <span class="k">Proxmox LXC</span> (Ubuntu 24.04)                      │
+│  /upload → /tmp/ (30分自動削除)                    │
+│  printer-mcp-server (Node.js 22)                  │
+│   ├── PDF/画像/テキスト → 直接CUPS                 │
+│   ├── Office → <span class="v">Graph API</span> → PDF → CUPS            │
+│   └── validate → <span class="v">3,192</span> PPD制約ルール              │
+│  CUPS + Kyocera UPD v10.0                         │
+│   └── socket:// → <span class="g_">TASKalfa 6054ci</span>               │
+└──────────────────────────────────────────────────┘
   </div>
 </div></section>
 
 <!-- Hardware -->
-<section class="sec--alt sec" id="hw"><div class="wrap">
-  <h2 class="sec__title">🔧 ハードウェア構成</h2>
-  <p class="sec__sub">DF-7150フィニッシャー + BF-9100中折りユニット + パンチ + インサーター。全オプションの物理スペックをdescriptionに焼き込み済み。</p>
-  <div class="grid grid--2">
-    <div class="card"><div class="card__ico">📎</div><div class="card__h">DF-7150 フィニッシャー</div><div class="card__p">4,000枚排紙。2トレイ仕分け。シフトソート。<br><strong>3種類の100枚ステープル:</strong> 左上(Front)・右上(Rear)・中綴じ(Center)。<br>用紙: 52-300gsm対応。</div><div class="card__tag card__tag--limit">最大100枚ステープル</div></div>
-    <div class="card"><div class="card__ico">📖</div><div class="card__h">BF-9100 中折りユニット</div><div class="card__p"><strong>中綴じ製本:</strong> 最大20枚(80ページ)。自動ステープル+折り。<br><strong>三つ折り:</strong> A4/Letterのみ、最大3枚重ね。<br><strong>二つ折り:</strong> A3-B5、最大3枚重ね。</div><div class="card__tag card__tag--limit">60-90gsm普通紙のみ</div></div>
-    <div class="card"><div class="card__ico">🕳️</div><div class="card__h">PH-7B パンチユニット</div><div class="card__p">2穴・3穴・4穴対応。A4/A3/B4/B5/Letter等の標準サイズ。<br>A6以下・封筒・厚紙・ラベル・穴あき済みは不可。</div></div>
-    <div class="card"><div class="card__ico">📑</div><div class="card__h">IS-7100 インサーター</div><div class="card__p">2トレイ。表紙・裏表紙・章区切り合紙を自動挿入。<br>中綴じ製本と組み合わせて表紙付き冊子を一括作成。</div></div>
+<section class="s"><div class="w">
+  <h2 class="s__t">🔧 ハードウェア</h2>
+  <div class="g2">
+    <div class="c"><div class="c__i">📎</div><div class="c__h">DF-7150 フィニッシャー</div><div class="c__p">4,000枚排紙。3種類の<strong>100枚ステープル</strong>（左上/右上/中綴じ）。シフトソート。</div></div>
+    <div class="c"><div class="c__i">📖</div><div class="c__h">BF-9100 中折りユニット</div><div class="c__p">中綴じ製本（<strong>最大20枚=80p</strong>）。三つ折り（A4/Letter）。二つ折り。60-90gsm。</div></div>
+    <div class="c"><div class="c__i">🕳️</div><div class="c__h">PH-7B パンチ</div><div class="c__p">2穴・3穴・4穴。A4/A3/B4/B5/Letter等。</div></div>
+    <div class="c"><div class="c__i">📑</div><div class="c__h">IS-7100 インサーター</div><div class="c__p">2トレイ。表紙・裏表紙・合紙の自動挿入。</div></div>
   </div>
 </div></section>
 
 <!-- Tools -->
-<section class="sec" id="tools"><div class="wrap">
-  <h2 class="sec__title">⚡ 11 MCPツール</h2>
-  <p class="sec__sub">印刷・変換・バリデーション・プリンタ管理の全機能。cups_optionsのdescriptionに全オプション・制約・組み合わせ例を焼き込み済み。</p>
+<section class="s--a s" id="tools"><div class="w">
+  <h2 class="s__t">⚡ 11 MCPツール</h2>
   <table class="tbl">
     <thead><tr><th>#</th><th>ツール</th><th>種別</th><th>説明</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td><code>print_document</code></td><td><span class="tag tag-w">W</span></td><td>base64ファイル印刷。Office自動変換。cups_optionsでフィニッシャー完全制御</td></tr>
+      <tr><td>1</td><td><code>print_uploaded</code></td><td><span class="tag tag-w">W</span></td><td><strong>メイン印刷。</strong> /upload済みファイルをfile_idで印刷。ゼロトークン</td></tr>
       <tr><td>2</td><td><code>print_url</code></td><td><span class="tag tag-w">W</span></td><td>URLダウンロード→変換→印刷</td></tr>
-      <tr><td>3</td><td><code>convert_to_pdf</code></td><td><span class="tag tag-r">R</span></td><td>Office→PDF変換のみ（base64返却、プレビュー用）</td></tr>
-      <tr><td>4</td><td><code>validate_print_options</code></td><td><span class="tag tag-r">R</span></td><td><strong>3,192件PPD制約ルールで事前検証</strong></td></tr>
-      <tr><td>5</td><td><code>list_printers</code></td><td><span class="tag tag-r">R</span></td><td>登録プリンタ一覧</td></tr>
-      <tr><td>6</td><td><code>get_printer_status</code></td><td><span class="tag tag-r">R</span></td><td>プリンタ状態 + トレイ紙設定</td></tr>
-      <tr><td>7</td><td><code>get_printer_capabilities</code></td><td><span class="tag tag-r">R</span></td><td>PPDオプション一覧 (filter引数で絞込)</td></tr>
-      <tr><td>8</td><td><code>get_print_jobs</code></td><td><span class="tag tag-r">R</span></td><td>キュー一覧（完了ジョブ含む）</td></tr>
-      <tr><td>9</td><td><code>get_job_status</code></td><td><span class="tag tag-r">R</span></td><td>個別ジョブ詳細 + CUPSエラーログ</td></tr>
-      <tr><td>10</td><td><code>cancel_print_job</code></td><td><span class="tag tag-d">D</span></td><td>ジョブキャンセル</td></tr>
-      <tr><td>11</td><td><code>get_supported_formats</code></td><td><span class="tag tag-r">R</span></td><td>対応ファイル形式一覧</td></tr>
+      <tr><td>3</td><td><code>validate_print_options</code></td><td><span class="tag tag-r">R</span></td><td><strong>3,192件PPD制約 + CUPSビルトイン対応</strong></td></tr>
+      <tr><td>4</td><td><code>list_uploads</code></td><td><span class="tag tag-r">R</span></td><td>アップロード済みファイル一覧</td></tr>
+      <tr><td>5</td><td><code>get_printer_capabilities</code></td><td><span class="tag tag-r">R</span></td><td>PPDオプション (filter付)</td></tr>
+      <tr><td>6</td><td><code>get_supported_formats</code></td><td><span class="tag tag-r">R</span></td><td>対応形式一覧</td></tr>
+      <tr><td>7</td><td><code>list_printers</code></td><td><span class="tag tag-r">R</span></td><td>プリンタ一覧</td></tr>
+      <tr><td>8</td><td><code>get_printer_status</code></td><td><span class="tag tag-r">R</span></td><td>状態 + トレイ紙設定</td></tr>
+      <tr><td>9</td><td><code>get_print_jobs</code></td><td><span class="tag tag-r">R</span></td><td>キュー一覧</td></tr>
+      <tr><td>10</td><td><code>get_job_status</code></td><td><span class="tag tag-r">R</span></td><td>ジョブ詳細 + CUPSログ</td></tr>
+      <tr><td>11</td><td><code>cancel_print_job</code></td><td><span class="tag tag-d">D</span></td><td>ジョブキャンセル</td></tr>
     </tbody>
   </table>
 </div></section>
 
 <!-- Finisher -->
-<section class="sec--alt sec" id="finisher"><div class="wrap">
-  <h2 class="sec__title">📎 フィニッシャー機能詳細</h2>
-  <p class="sec__sub">cups_optionsパラメーターで全機能を制御。全オプション値・制約・向き・折り方向・物理上限を解説。</p>
+<section class="s" id="finisher"><div class="w">
+  <h2 class="s__t">📎 フィニッシャー詳細</h2>
 
-  <h3 style="font-size:1.05rem;font-weight:700;margin-bottom:.75rem">中綴じ製本 (KCBooklet)</h3>
+  <h3 style="font-size:1.05rem;font-weight:700;margin-bottom:.75rem">中綴じ製本</h3>
   <div class="pre">
-<span class="c">// 左綴じ（横書き）→ A3紙に2面付け → 自動ステープル → 中折り → A4冊子</span>
+<span class="c_">// 左綴じ（横書き）→ A3紙に2面付け → 自動ステープル → 折り → A4冊子</span>
 {<span class="k">"KCBooklet"</span>:<span class="v">"Left"</span>, <span class="k">"Fold"</span>:<span class="v">"True"</span>, <span class="k">"PageSize"</span>:<span class="v">"A4"</span>}
-
-<span class="c">// 右綴じ（縦書き・和文） → B4紙使用 → B5冊子</span>
+<span class="c_">// 右綴じ（縦書き・和文）→ B4紙使用 → B5冊子</span>
 {<span class="k">"KCBooklet"</span>:<span class="v">"Right"</span>, <span class="k">"Fold"</span>:<span class="v">"True"</span>, <span class="k">"PageSize"</span>:<span class="v">"B5"</span>}
   </div>
-  <div class="grid grid--3" style="margin-top:1rem">
-    <div class="card"><div class="card__h">PageSizeは仕上がりサイズ</div><div class="card__p">A4指定→A3紙を自動使用<br>B5指定→B4紙を自動使用<br>A5指定→A4紙を自動使用</div></div>
-    <div class="card"><div class="card__h">綴じ方向</div><div class="card__p"><strong>Left</strong> = 左綴じ（横書き、右にめくる）<br><strong>Right</strong> = 右綴じ（縦書き・和文、左にめくる）</div></div>
-    <div class="card"><div class="card__h">制約</div><div class="card__p">最大<strong>20枚(80p)</strong>、<strong>60-90gsm</strong>普通紙のみ。Stplと同時指定不可（自動ステープル）。</div></div>
+  <div class="g3" style="margin-top:1rem">
+    <div class="c"><div class="c__h">PageSize=仕上がりサイズ</div><div class="c__p">A4→A3紙自動、B5→B4紙自動、A5→A4紙自動</div></div>
+    <div class="c"><div class="c__h">綴じ方向</div><div class="c__p"><strong>Left</strong>=左綴じ(横書き)<br><strong>Right</strong>=右綴じ(縦書き)</div></div>
+    <div class="c"><div class="c__h">物理制約</div><div class="c__p"><strong>20枚(80p)</strong>、60-90gsm普通紙のみ。Stplと同時不可。</div></div>
   </div>
 
-  <h3 style="font-size:1.05rem;font-weight:700;margin:2rem 0 .75rem">折り (FldA)</h3>
+  <h3 style="font-size:1.05rem;font-weight:700;margin:2rem 0 .75rem">面付け + 製本</h3>
   <div class="pre">
-<span class="c">// A4三つ折り（宛名が外側に見える＝封筒にそのまま入れて読める）</span>
-{<span class="k">"FldA"</span>:<span class="v">"Trifold"</span>, <span class="k">"FldB"</span>:<span class="v">"FPInside"</span>, <span class="k">"FldC"</span>:<span class="v">"RIGHTL"</span>, <span class="k">"OutputBin"</span>:<span class="v">"FLDTRAY"</span>}
-
-<span class="c">// A3二つ折り（1ページ目が内側）</span>
-{<span class="k">"FldA"</span>:<span class="v">"Bifold"</span>, <span class="k">"BiFldB"</span>:<span class="v">"FPInside"</span>, <span class="k">"OutputBin"</span>:<span class="v">"FLDTRAY"</span>}
+<span class="c_">// 横長PPTX → A4縦に2スライド配置 → 中綴じ製本</span>
+{<span class="k">"number-up"</span>:<span class="v">"2"</span>, <span class="k">"KCBooklet"</span>:<span class="v">"Left"</span>, <span class="k">"Fold"</span>:<span class="v">"True"</span>, <span class="k">"PageSize"</span>:<span class="v">"A4"</span>}
+<span class="c_">// ↑ CUPSが2up面付け → Kyoceraドライバが冊子面付け → 印刷 → 中綴じ</span>
   </div>
-  <div class="grid grid--4" style="margin-top:1rem">
-    <div class="card"><div class="card__h">三つ折り</div><div class="card__p"><strong>A4/Letterのみ</strong><br>最大3枚重ね<br>BF-9100の制約</div></div>
-    <div class="card"><div class="card__h">二つ折り</div><div class="card__p">A3,A4,B4,B5等<br>最大3枚重ね<br>A5以下不可</div></div>
-    <div class="card"><div class="card__h">折り面 (FldB)</div><div class="card__p"><strong>FPInside</strong>: 1p内側<br><strong>FPOutside</strong>: 1p外側</div></div>
-    <div class="card"><div class="card__h">折り方向 (FldC)</div><div class="card__p"><strong>RIGHTL</strong>: 右→左<br><strong>LEFTR</strong>: 左→右</div></div>
+  <div class="g4" style="margin-top:1rem">
+    <div class="c"><div class="c__h">number-up</div><div class="c__p">2|4|6|9|16<br>1枚にNページ配置</div></div>
+    <div class="c"><div class="c__h">layout</div><div class="c__p"><strong>lrtb</strong>: 標準<br><strong>rltb</strong>: 縦書き向け</div></div>
+    <div class="c"><div class="c__h">KCBookletと併用可</div><div class="c__p">CUPS面付け→ドライバ製本。レイヤーが異なる。</div></div>
+    <div class="c"><div class="c__h">折りとも併用可</div><div class="c__p">面付け→二つ折り/三つ折り→配布。</div></div>
   </div>
 
-  <h3 style="font-size:1.05rem;font-weight:700;margin:2rem 0 .75rem">ステープル＋パンチ＋両面</h3>
+  <h3 style="font-size:1.05rem;font-weight:700;margin:2rem 0 .75rem">折り・ステープル・パンチ・両面</h3>
   <div class="pre">
-<span class="c">// A4両面 + 左上ステープル + 2穴パンチ</span>
+<span class="c_">// A4三つ折り（宛名が外側、封筒用）</span>
+{<span class="k">"FldA"</span>:<span class="v">"Trifold"</span>, <span class="k">"FldB"</span>:<span class="v">"FPInside"</span>, <span class="k">"OutputBin"</span>:<span class="v">"FLDTRAY"</span>}
+<span class="c_">// A4両面 + 左上ステープル + 2穴パンチ</span>
 {<span class="k">"Stpl"</span>:<span class="v">"Front"</span>, <span class="k">"Scnt"</span>:<span class="v">"All"</span>, <span class="k">"Pnch"</span>:<span class="v">"2Hole"</span>, <span class="k">"Duplex"</span>:<span class="v">"DuplexNoTumble"</span>}
-
-<span class="c">// 横向き上下見開き両面（カレンダー式）</span>
-{<span class="k">"Duplex"</span>:<span class="v">"DuplexTumble"</span>}
-  </div>
-  <div class="grid grid--3" style="margin-top:1rem">
-    <div class="card"><div class="card__h">ステープル</div><div class="card__p"><strong>Front</strong>=左上 <strong>Rear</strong>=右上<br><strong>Center</strong>=中綴じ用<br>⚠ Scntも必ず設定</div><div class="card__tag card__tag--limit">最大100枚</div></div>
-    <div class="card"><div class="card__h">パンチ</div><div class="card__p"><strong>2Hole</strong> / <strong>3Hole</strong> / <strong>4Hole</strong><br>A6以下・封筒・厚紙不可</div></div>
-    <div class="card"><div class="card__h">両面</div><div class="card__p"><strong>NoTumble</strong>: 長辺綴じ（通常の両面）<br><strong>Tumble</strong>: 短辺綴じ（上下見開き）</div></div>
   </div>
 </div></section>
 
 <!-- Validation -->
-<section class="sec" id="validation"><div class="wrap">
-  <h2 class="sec__title">🛡️ PPD制約バリデーション</h2>
-  <p class="sec__sub">Kyocera PPDファイルから抽出した3,192件のUIConstraints + cupsUIConstraintsルールで、印刷前にオプション互換性を自動検証。日本語エラーメッセージ付き。</p>
-
-  <div class="cst">
-    <div class="cst__h">❌ 中綴じ + コーナーステープル</div>
-    <div class="cst__m">ステープル(Front) と 中綴じ製本(Left) は同時に指定できません</div>
-  </div>
-  <div class="cst">
-    <div class="cst__h">❌ A5 + 二つ折り</div>
-    <div class="cst__m">折りモード(Bifold) と 用紙サイズ(A5) は同時に指定できません</div>
-  </div>
-  <div class="cst">
-    <div class="cst__h">❌ 厚紙 + パンチ</div>
-    <div class="cst__m">用紙種類(Cardstock) と パンチ(2Hole) は同時に指定できません</div>
-  </div>
-  <div class="cst cst--ok">
-    <div class="cst__h">✅ A4両面 + ステープル + パンチ</div>
-    <div class="cst__m">全て有効。印刷できます。（2,134ルール検査済み、違反0）</div>
-  </div>
-
-  <h3 style="font-size:1.05rem;font-weight:700;margin:2.5rem 0 1rem">10の重要ルール</h3>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:.75rem">
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>1.</strong> 中綴じとステープルは同時不可（自動ステープル）</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>2.</strong> 折り使用時は OutputBin=FLDTRAY 必須</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>3.</strong> A5以下はステープル/折り不可</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>4.</strong> 封筒/ラベル/OHPは後処理全不可</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>5.</strong> 厚紙はステープル/パンチ/折り全不可</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>6.</strong> 中綴じPageSizeは仕上がりサイズ（A4→A3紙自動）</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>7.</strong> 三つ折りはA4/Letterのみ</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>8.</strong> 中綴じ最大20枚(80p)、折り最大3枚、普通紙のみ</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>9.</strong> 印刷前に validate_print_options で必ず検証</div></div>
-    <div class="card" style="padding:1rem"><div class="card__p"><strong>10.</strong> get_printer_status でトレイ紙設定を確認</div></div>
-  </div>
+<section class="s--a s" id="validation"><div class="w">
+  <h2 class="s__t">🛡️ PPD制約バリデーション</h2>
+  <p class="s__d">3,192件のUIConstraintsルール + CUPSビルトインオプション対応。印刷前に自動検証。</p>
+  <div class="cst"><div class="cst__h">❌ 中綴じ + コーナーステープル</div><div class="cst__m">ステープル(Front) と 中綴じ製本(Left) は同時に指定できません</div></div>
+  <div class="cst"><div class="cst__h">❌ A5 + 二つ折り</div><div class="cst__m">折りモード(Bifold) と 用紙サイズ(A5) は同時に指定できません</div></div>
+  <div class="cst cst--ok"><div class="cst__h">✅ 2up面付け + 中綴じ製本</div><div class="cst__m">全て有効。number-up: CUPS built-in, KCBooklet/Fold/PageSize: PPD validated</div></div>
+  <div class="cst cst--ok"><div class="cst__h">✅ A4両面 + ステープル + パンチ</div><div class="cst__m">全て有効。2,134ルール検査済み、違反0</div></div>
 </div></section>
 
-<!-- AI Workflow -->
-<section class="sec--alt sec"><div class="wrap">
-  <h2 class="sec__title">🤖 AIの推奨ワークフロー</h2>
-  <p class="sec__sub">descriptionに焼き込み済み。AIはこの順序に従って自動で実行します。</p>
+<!-- Workflow -->
+<section class="s"><div class="w">
+  <h2 class="s__t">🤖 AIの推奨ワークフロー</h2>
   <div class="flow">
-    <div class="flow__step"><div class="flow__n">①</div>get_printer_status<br><small style="color:var(--text3)">トレイ紙確認</small></div>
-    <div class="flow__arrow">→</div>
-    <div class="flow__step"><div class="flow__n">②</div>cups_options構築<br><small style="color:var(--text3)">descriptionから</small></div>
-    <div class="flow__arrow">→</div>
-    <div class="flow__step"><div class="flow__n">③</div>validate_print_options<br><small style="color:var(--text3)">3,192ルール検証</small></div>
-    <div class="flow__arrow">→</div>
-    <div class="flow__step"><div class="flow__n">④</div>print_document<br><small style="color:var(--text3)">変換+印刷</small></div>
-    <div class="flow__arrow">→</div>
-    <div class="flow__step"><div class="flow__n">⑤</div>get_job_status<br><small style="color:var(--text3)">完了確認</small></div>
+    <div class="flow__s"><div class="flow__n">①</div>get_printer_status<br><small style="color:var(--tx3)">トレイ紙確認</small></div>
+    <div class="flow__s"><div class="flow__n">②</div>curl /upload<br><small style="color:var(--tx3)">ファイル送信</small></div>
+    <div class="flow__s"><div class="flow__n">③</div>validate<br><small style="color:var(--tx3)">3,192ルール</small></div>
+    <div class="flow__s"><div class="flow__n">④</div>print_uploaded<br><small style="color:var(--tx3)">変換+印刷</small></div>
+    <div class="flow__s"><div class="flow__n">⑤</div>get_job_status<br><small style="color:var(--tx3)">完了確認</small></div>
   </div>
 </div></section>
 
 <!-- Setup -->
-<section class="sec" id="setup"><div class="wrap">
-  <h2 class="sec__title">🚀 セットアップ（5ステップ）</h2>
-  <p class="sec__sub">Vercelワンクリックではありません。Proxmox LXC + CUPS + Kyoceraドライバ + Cloudflare Tunnel の構成です。</p>
+<section class="s--a s" id="setup"><div class="w">
+  <h2 class="s__t">🚀 セットアップ（5ステップ）</h2>
+  <p class="s__d">Vercelワンクリックではありません。Proxmox LXC + CUPS + Kyoceraドライバ + Cloudflare Tunnel の構成。</p>
   <div class="steps">
-    <div class="step"><div class="step__h">Proxmox LXCコンテナ作成</div><div class="step__p">Ubuntu 24.04テンプレートからクローン。2コア/4GB/20GB推奨。onboot=1で自動起動。</div></div>
-    <div class="step"><div class="step__h">CUPS + Kyoceraドライバ + プリンタ登録</div><div class="step__p">cups, cups-client, cups-filters, ghostscriptをインストール。Kyocera UPD v10.0のdebパッケージを導入。lpadminでsocket://プリンタIP:9100を登録。フィニッシャー設定（DF-7150, Punch, Fold, Inserter）。</div></div>
-    <div class="step"><div class="step__h">MCPサーバーデプロイ</div><div class="step__p">Node.js 22をインストール。リポジトリをgit clone → npm install → npm run build。systemdサービスを作成して環境変数（MCP_API_KEY, GRAPH_*）を設定。</div></div>
-    <div class="step"><div class="step__h">Cloudflare Tunnel</div><div class="step__p">cloudflaredをLXC内にインストール。Cloudflareダッシュボードでトンネル作成→トークン取得→cloudflared service install。hostname → http://localhost:3000 のingressルールを設定。</div></div>
-    <div class="step"><div class="step__h">クライアント接続</div><div class="step__p">Claude.ai → Settings → MCP → Add で URL: https://printer-mcp.your-domain/mcp?key=YOUR_KEY を設定。Claude Desktop/Cursor/Claude Codeも対応。</div></div>
+    <div class="step"><div class="step__h">Proxmox LXCコンテナ作成</div><div class="step__p">Ubuntu 24.04テンプレートからクローン。2コア/4GB/20GB。onboot=1。</div></div>
+    <div class="step"><div class="step__h">CUPS + Kyoceraドライバ + プリンタ登録</div><div class="step__p">CUPS, Kyocera UPD v10.0, lpadminでsocket://プリンタIP:9100登録。フィニッシャー設定（DF-7150, Punch, Fold, Inserter）。</div></div>
+    <div class="step"><div class="step__h">MCPサーバーデプロイ</div><div class="step__p">Node.js 22 → git clone → npm install → npm run build → systemdサービス化。環境変数にMCP_API_KEY, GRAPH_*を設定。</div></div>
+    <div class="step"><div class="step__h">Cloudflare Tunnel</div><div class="step__p">cloudflaredインストール → トンネル作成 → hostname → http://localhost:3000。</div></div>
+    <div class="step"><div class="step__h">Claude.aiに接続</div><div class="step__p">Settings → MCP → Add。URL: https://printer-mcp.your-domain/mcp?key=KEY</div></div>
   </div>
-  <p style="color:var(--text3);font-size:.8rem;margin-top:1rem">📖 詳細な手順は <a href="https://github.com/DaisukeHori/printer-mcp-server#セットアップ5ステップ">README</a> を参照してください。</p>
+  <p style="color:var(--tx3);font-size:.8rem">📖 <a href="https://github.com/DaisukeHori/printer-mcp-server#セットアップ5ステップ">README</a> に詳細手順があります。</p>
 </div></section>
 
 <footer class="footer">
   <p>printer-mcp-server — MIT License — <a href="https://github.com/DaisukeHori/printer-mcp-server">GitHub</a></p>
   <p style="margin-top:.4rem">Built by <a href="https://github.com/DaisukeHori">Daisuke Hori</a></p>
 </footer>
-
 </body>
 </html>
