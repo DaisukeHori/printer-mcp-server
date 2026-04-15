@@ -24,7 +24,12 @@ Punch (Pnch): None | 2Hole | 3Hole | 4Hole
   → 使えない紙種類: Cardstock,Envelope,Labels,Prepunched,Transparency
 
 中綴じ製本 (KCBooklet): None | Left | Right
-  → 使える紙サイズ: A4, A5, B5, Letter, P16K のみ（A3,B4,Legal,Tabloid等は不可）
+  ⚠ PageSizeは「仕上がりサイズ」を指定。プリンタが自動的に倍サイズの紙を使う。
+    PageSize=A4 → A3紙に印刷して折り → A4冊子
+    PageSize=A5 → A4紙に印刷して折り → A5冊子
+    PageSize=B5 → B4紙に印刷して折り → B5冊子
+    PageSize=Letter → Tabloid紙に印刷して折り → Letter冊子
+  → A3/B4/Tabloid等はPageSizeとして指定不可（倍サイズの紙が存在しないため）
   → Stplと同時指定不可（中綴じは内部で自動ステープル）
   → Fold=True で折りを追加
 
@@ -55,6 +60,9 @@ Punch (Pnch): None | 2Hole | 3Hole | 4Hole
 === よくある組み合わせ ===
 A4両面+左上ステープル+パンチ: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole","Duplex":"DuplexNoTumble","PageSize":"A4"}
 A4中綴じ製本(折り付き): {"KCBooklet":"Left","Fold":"True","PageSize":"A4"}
+  ↑ A3紙に2面付け印刷→中綴じステープル→折り→A4冊子
+B5中綴じ製本: {"KCBooklet":"Left","Fold":"True","PageSize":"B5"}
+  ↑ B4紙使用→B5冊子
 A4三つ折り: {"FldA":"Trifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A4"}
 A3二つ折り: {"FldA":"Bifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A3"}
 厚紙カセット2から: {"InputSlot":"PF730B","MediaType":"Thick","PageSize":"A4"}
@@ -62,12 +70,12 @@ A3二つ折り: {"FldA":"Bifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSi
 === 重要な制約まとめ ===
 1. KCBooklet(中綴じ)とStpl(ステープル)は同時指定不可。中綴じは自動ステープル。
 2. 折り(FldA)使用時はOutputBin=FLDTRAY必須。
-3. A5以下の小さい紙はステープル/折り/中綴じすべて不可。
+3. A5以下の小さい紙はステープル/折り不可（コーナーステープルもA5不可）。
 4. 封筒/ラベル/OHPはステープル/パンチ/折りすべて不可。
 5. 厚紙(Cardstock/Thick)はステープル/パンチ/折りすべて不可。
-6. 中綴じ製本はA4/A5/B5/Letterのみ対応。A3/B4/Legal不可。
+6. 中綴じのPageSizeは仕上がりサイズ。A4→A3紙、B5→B4紙を自動使用。A3/B4自体はPageSizeに指定不可。
 7. 三つ折りはA3/A4/Letter/Legal/Tabloidのみ。B4/B5も不可。
-8. validate_print_options で事前に必ず検証すること。
+8. validate_print_options で事前に必ず検証すること（3192ルールで判定）。
 9. get_printer_status でトレイの紙サイズ・紙種類を確認してから印刷すること。`;
 
 export const PrintDocumentInputSchema = z.object({
