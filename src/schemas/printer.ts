@@ -6,7 +6,7 @@ const CUPS_OPTIONS_DESC = `CUPS/PPD options. Use validate_print_options BEFORE p
 WORKFLOW: get_printer_status → build options → validate_print_options → print_document → get_job_status
 
 KEY OPTIONS:
-  Stpl: Front(左上1箇所)|Rear(右上1箇所)|DualLeft(左辺2箇所)|Center(左辺2箇所,DualLeftと同じ) + Scnt:All必須. Max100枚. A5以下/封筒/厚紙不可
+  Stpl: Front(左下1箇所)|Rear(左上1箇所)|DualLeft(左辺2箇所)|TopRight(右上1箇所)|DualRight(右辺2箇所)|DualTop(上辺2箇所)|Center(=DualLeft) + Scnt:All必須. Max100枚. A5以下/封筒/厚紙不可
   Pnch: 2Hole|3Hole|4Hole. A6以下/封筒/厚紙不可
   KCBooklet: Left(横書き)|Right(縦書き) + Fold:True. PageSize=仕上がりサイズ(A4→A3紙自動). Max20枚(80p),60-90gsm. Stplと同時不可
   FldA: Bifold(A3-B5)|Trifold(A4/Letterのみ) + FldB:FPInside|FPOutside + OutputBin:FLDTRAY必須. Max3枚,普通紙のみ
