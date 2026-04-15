@@ -23,7 +23,10 @@ COMMON:
   A4両面+ステープル+パンチ: {"Stpl":"Front","Scnt":"All","Pnch":"2Hole","Duplex":"DuplexNoTumble","PageSize":"A4"}
   A4中綴じ左綴じ: {"KCBooklet":"Left","Fold":"True","PageSize":"A4"}
   A4三つ折り: {"FldA":"Trifold","FldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A4"}
-  A4に4ページ面付け: {"number-up":"4","number-up-layout":"lrtb","PageSize":"A4"}`;
+  A4に4ページ面付け: {"number-up":"4","number-up-layout":"lrtb","PageSize":"A4"}
+  2ページ面付け+両面+ステープル(紙節約): {"number-up":"2","Duplex":"DuplexNoTumble","Stpl":"Front","Scnt":"All","PageSize":"A4"}
+  4ページ面付け+両面+パンチ(配布資料): {"number-up":"4","number-up-layout":"lrtb","Duplex":"DuplexNoTumble","Pnch":"2Hole","PageSize":"A4"}
+  A3に2ページ面付け+二つ折り(リーフレット): {"number-up":"2","FldA":"Bifold","BiFldB":"FPInside","OutputBin":"FLDTRAY","PageSize":"A3"}`;
 
 export const ValidatePrintOptionsInputSchema = z.object({
   cups_options: z.record(z.string(), z.string()).describe("Options to validate before printing"),
