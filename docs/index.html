@@ -73,7 +73,7 @@ a{color:var(--cy);text-decoration:none}a:hover{color:#22d3ee}code{font-family:va
   <div class="hero__chip">🖨 11 Tools · 70 Formats · 7 Staple Modes · Zero-Token · 3,192 PPD Rules</div>
   <h1>AIに<em>「印刷して」</em><br>と言うだけ</h1>
   <p class="hero__p">HEIC写真もPhotoshopもAutoCAD(DXF)もMarkdownもOffice文書も、何でも同じ操作で印刷。7種類のステープル、中綴じ製本（タテ・ヨコ）、折り、面付け、パンチをAIが自動制御。</p>
-  <div class="hero__ep">Endpoint: <b>https://printer-mcp.appserver.tokyo/mcp</b></div>
+  <div class="hero__ep">Self-hosted · <b>Proxmox LXC + CUPS + Cloudflare Tunnel</b></div>
 </section>
 
 <section style="padding:0 1.5rem 3rem"><div class="w">
@@ -102,7 +102,7 @@ a{color:var(--cy);text-decoration:none}a:hover{color:#22d3ee}code{font-family:va
   <h2 class="s__t">⚡ ゼロトークン印刷</h2>
   <div class="pre">
 <span class="c_"># curlでアップロード → file_id取得 → MCPで印刷</span>
-curl -sF <span class="v">"file=@photo.heic"</span> <span class="k">https://printer-mcp.appserver.tokyo/upload</span>
+curl -sF <span class="v">"file=@photo.heic"</span> <span class="k">https://your-printer-mcp.example.com/upload</span>
 → {<span class="k">"file_id"</span>:<span class="v">"abc123"</span>}
 <span class="k">print_uploaded</span>(file_id=<span class="v">"abc123"</span>, cups_options={<span class="k">"Duplex"</span>:<span class="v">"DuplexNoTumble"</span>})
 <span class="c_">// HEIC → ImageMagick → JPEG → CUPS → 印刷</span>
