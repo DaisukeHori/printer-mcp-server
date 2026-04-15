@@ -53,24 +53,30 @@ const DIRECT_PRINT_FORMATS = new Set([
   ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".gif", ".bmp",
 ]);
 
+const IMAGE_CONVERT_FORMATS = new Set([
+  ".heic", ".heif", ".avif", ".webp", ".svg", ".svgz",
+]);
+
 const OFFICE_FORMATS = new Set([
   ".doc", ".docx", ".docm", ".dotx", ".dotm", ".rtf", ".odt",
   ".xls", ".xlsx", ".xlsm", ".xlsb", ".xltx", ".csv",
   ".ppt", ".pptx", ".pptm", ".ppsx", ".pps", ".potx",
 ]);
 
-export type ConvertRoute = "direct" | "mac-office" | "unsupported";
+export type ConvertRoute = "direct" | "image-convert" | "mac-office" | "unsupported";
 
 export function detectRoute(filename: string): ConvertRoute {
   const ext = extname(filename).toLowerCase();
   if (DIRECT_PRINT_FORMATS.has(ext)) return "direct";
+  if (IMAGE_CONVERT_FORMATS.has(ext)) return "image-convert";
   if (OFFICE_FORMATS.has(ext)) return "mac-office";
   return "unsupported";
 }
 
-export function getSupportedFormats(): { direct: string[]; macOffice: string[] } {
+export function getSupportedFormats(): { direct: string[]; imageConvert: string[]; macOffice: string[] } {
   return {
     direct: [...DIRECT_PRINT_FORMATS].sort(),
+    imageConvert: [...IMAGE_CONVERT_FORMATS].sort(),
     macOffice: [...OFFICE_FORMATS].sort(),
   };
 }
@@ -99,6 +105,51 @@ export interface ConvertResult {
   fileSize: number;
   error: string;
   route: string;
+}
+
+// ─── Image conversion (HEIC/HEIF/AVIF/WEBP/SVG → JPEG) ───
+
+export async function convertImageFile(
+  fileBuffer: Buffer,
+  filename: string,
+): Promise<ConvertResult> {
+  await mkdir(TMP_DIR, { recursive: true });
+  const jobId = randomUUID().slice(0, 8);
+  const localInput = join(TMP_DIR, `${jobId}-${filename}`);
+  const ext = extname(filename);
+  const jpgName = basename(filename, ext) + ".jpg";
+  const localOutput = join(TMP_DIR, `${jobId}-${jpgName}`);
+
+  try {
+    await writeFile(localInput, fileBuffer);
+
+    // ImageMagick convert: HEIC/HEIF/AVIF/WEBP/SVG → JPEG
+    // -quality 95 for high quality, -density 300 for SVG rendering
+    const density = ext.toLowerCase().match(/\.svg/) ? "-density 300" : "";
+    await execAsync(
+      `convert ${density} "${localInput}" -quality 95 -colorspace sRGB "${localOutput}"`,
+      60_000,
+    );
+
+    const outputBuffer = await readFile(localOutput);
+
+    return {
+      success: true,
+      pdfPath: localOutput, // reuse field for output path
+      pdfBase64: outputBuffer.toString("base64"),
+      originalFile: filename,
+      fileSize: outputBuffer.length,
+      error: "",
+      route: "image-convert",
+    };
+  } catch (err) {
+    return {
+      success: false, pdfPath: "", pdfBase64: "", originalFile: filename,
+      fileSize: 0, error: `Image conversion failed: ${(err as Error).message}`, route: "image-convert",
+    };
+  } finally {
+    try { await unlink(localInput); } catch {}
+  }
 }
 
 // ─── Graph API token cache ──────────────────────────────────

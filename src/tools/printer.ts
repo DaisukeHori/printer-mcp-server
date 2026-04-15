@@ -58,6 +58,27 @@ async function processAndPrint(
   let printBase64 = docBase64;
   let printFilename = filename;
 
+  // Convert image files (HEIC/HEIF/AVIF/WEBP/SVG) via ImageMagick
+  if (route === "image-convert") {
+    const buf = Buffer.from(docBase64, "base64");
+    const result = await converter.convertImageFile(buf, filename);
+
+    if (!result.success) {
+      return {
+        success: false, jobId: "", printer: options.printer || "(default)",
+        message: result.error,
+        commandOutput: "",
+      };
+    }
+
+    printBase64 = result.pdfBase64;
+    printFilename = filename.replace(/\.[^.]+$/, ".jpg");
+
+    if (result.pdfPath) {
+      await converter.cleanupTempPdf(result.pdfPath);
+    }
+  }
+
   // Convert Office files via Mac or Graph API
   if (route === "mac-office") {
     if (!converter.isOfficeConversionAvailable()) {
@@ -249,6 +270,7 @@ Use filter to narrow: 'staple', 'punch', 'fold', 'tray', 'media', 'booklet', 'in
       const macStatus = converter.getConverterStatus();
       return ok({
         directPrint: { description: "Sent directly to CUPS (no conversion)", formats: formats.direct },
+        imageConvert: { description: "Converted to JPEG via ImageMagick (HEIC/HEIF/AVIF/WEBP/SVG)", formats: formats.imageConvert },
         macOfficeConvert: { description: "Converted to PDF via Mac Office (100% fidelity)", formats: formats.macOffice, status: macStatus },
       });
     }
