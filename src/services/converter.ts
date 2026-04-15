@@ -14,13 +14,35 @@ function getMacConfig() {
   const keyPath = process.env.MAC_SSH_KEY || "/root/.ssh/printer-mcp-mac";
   const remoteDir = process.env.MAC_CONVERT_DIR || "/tmp/printer-mcp-convert";
   const scriptPath = process.env.MAC_SCRIPT_PATH || "/opt/printer-mcp/convert.sh";
-
   return { host, user, keyPath, remoteDir, scriptPath };
+}
+
+function getGraphConfig() {
+  const tenantId = process.env.GRAPH_TENANT_ID || "";
+  const clientId = process.env.GRAPH_CLIENT_ID || "";
+  const clientSecret = process.env.GRAPH_CLIENT_SECRET || "";
+  const userId = process.env.GRAPH_USER_ID || "";
+  return { tenantId, clientId, clientSecret, userId };
 }
 
 export function isMacConfigured(): boolean {
   const { host, user } = getMacConfig();
   return host !== "" && user !== "";
+}
+
+export function isGraphConfigured(): boolean {
+  const { tenantId, clientId, clientSecret, userId } = getGraphConfig();
+  return tenantId !== "" && clientId !== "" && clientSecret !== "" && userId !== "";
+}
+
+export function isOfficeConversionAvailable(): boolean {
+  return isMacConfigured() || isGraphConfigured();
+}
+
+export function getConverterStatus(): string {
+  if (isMacConfigured()) return `✅ Mac converter (${process.env.MAC_USER}@${process.env.MAC_HOST})`;
+  if (isGraphConfigured()) return `✅ Graph API converter (${process.env.GRAPH_USER_ID})`;
+  return "❌ No Office converter configured";
 }
 
 // ─── Format detection ───────────────────────────────────────
@@ -32,11 +54,8 @@ const DIRECT_PRINT_FORMATS = new Set([
 ]);
 
 const OFFICE_FORMATS = new Set([
-  // Word
   ".doc", ".docx", ".docm", ".dotx", ".dotm", ".rtf", ".odt",
-  // Excel
   ".xls", ".xlsx", ".xlsm", ".xlsb", ".xltx", ".csv",
-  // PowerPoint
   ".ppt", ".pptx", ".pptm", ".ppsx", ".pps", ".potx",
 ]);
 
@@ -49,7 +68,7 @@ export function detectRoute(filename: string): ConvertRoute {
   return "unsupported";
 }
 
-export function getSupportedFormats(): { direct: string[]; macOffice: string[]; } {
+export function getSupportedFormats(): { direct: string[]; macOffice: string[] } {
   return {
     direct: [...DIRECT_PRINT_FORMATS].sort(),
     macOffice: [...OFFICE_FORMATS].sort(),
@@ -70,7 +89,7 @@ function execAsync(cmd: string, timeout = CONVERT_TIMEOUT): Promise<{ stdout: st
   });
 }
 
-// ─── Mac conversion interface ───────────────────────────────
+// ─── Conversion result interface ────────────────────────────
 
 export interface ConvertResult {
   success: boolean;
@@ -79,34 +98,141 @@ export interface ConvertResult {
   originalFile: string;
   fileSize: number;
   error: string;
-  route: ConvertRoute;
+  route: string;
 }
 
-/**
- * Convert an Office document to PDF via Mac.
- * 1. SCP file to Mac
- * 2. SSH exec convert.sh
- * 3. SCP result PDF back
- * 4. Cleanup both sides
- */
+// ─── Graph API token cache ──────────────────────────────────
+
+let graphTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getGraphAccessToken(): Promise<string> {
+  // Return cached token if still valid (5 min buffer)
+  if (graphTokenCache && Date.now() < graphTokenCache.expiresAt - 300_000) {
+    return graphTokenCache.token;
+  }
+
+  const { tenantId, clientId, clientSecret } = getGraphConfig();
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: "https://graph.microsoft.com/.default",
+  });
+
+  const resp = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Graph token request failed (${resp.status}): ${errText}`);
+  }
+
+  const data = (await resp.json()) as { access_token: string; expires_in: number };
+  graphTokenCache = {
+    token: data.access_token,
+    expiresAt: Date.now() + data.expires_in * 1000,
+  };
+  return data.access_token;
+}
+
+// ─── Graph API conversion ───────────────────────────────────
+
+export async function convertViaGraph(
+  fileBuffer: Buffer,
+  filename: string,
+): Promise<ConvertResult> {
+  const { userId } = getGraphConfig();
+  const jobId = randomUUID().slice(0, 8);
+  const remoteName = `${jobId}-${filename}`;
+  const graphBase = "https://graph.microsoft.com/v1.0";
+
+  try {
+    const token = await getGraphAccessToken();
+    const headers = { Authorization: `Bearer ${token}` };
+
+    // 1. Upload file to OneDrive temp folder
+    const uploadUrl = `${graphBase}/users/${userId}/drive/root:/printer-mcp-temp/${remoteName}:/content`;
+    const uploadResp = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { ...headers, "Content-Type": "application/octet-stream" },
+      body: new Uint8Array(fileBuffer),
+    });
+
+    if (!uploadResp.ok) {
+      const errText = await uploadResp.text();
+      return {
+        success: false, pdfPath: "", pdfBase64: "", originalFile: filename,
+        fileSize: 0, error: `Graph upload failed (${uploadResp.status}): ${errText}`, route: "graph-api",
+      };
+    }
+
+    const uploadData = (await uploadResp.json()) as { id: string };
+    const itemId = uploadData.id;
+
+    // 2. Download as PDF via ?format=pdf
+    const pdfUrl = `${graphBase}/users/${userId}/drive/items/${itemId}/content?format=pdf`;
+    const pdfResp = await fetch(pdfUrl, {
+      headers,
+      redirect: "follow",
+    });
+
+    if (!pdfResp.ok) {
+      // Cleanup uploaded file
+      await fetch(`${graphBase}/users/${userId}/drive/items/${itemId}`, {
+        method: "DELETE", headers,
+      }).catch(() => {});
+
+      const errText = await pdfResp.text();
+      return {
+        success: false, pdfPath: "", pdfBase64: "", originalFile: filename,
+        fileSize: 0, error: `Graph PDF conversion failed (${pdfResp.status}): ${errText}`, route: "graph-api",
+      };
+    }
+
+    const pdfArrayBuf = await pdfResp.arrayBuffer();
+    const pdfBuffer = Buffer.from(pdfArrayBuf);
+
+    // 3. Delete temp file from OneDrive
+    await fetch(`${graphBase}/users/${userId}/drive/items/${itemId}`, {
+      method: "DELETE", headers,
+    }).catch(() => {}); // best-effort cleanup
+
+    // 4. Save locally for CUPS printing
+    await mkdir(TMP_DIR, { recursive: true });
+    const ext = extname(filename);
+    const pdfName = basename(filename, ext) + ".pdf";
+    const localOutput = join(TMP_DIR, `${jobId}-${pdfName}`);
+    await writeFile(localOutput, pdfBuffer);
+
+    return {
+      success: true,
+      pdfPath: localOutput,
+      pdfBase64: pdfBuffer.toString("base64"),
+      originalFile: filename,
+      fileSize: pdfBuffer.length,
+      error: "",
+      route: "graph-api",
+    };
+  } catch (err) {
+    return {
+      success: false, pdfPath: "", pdfBase64: "", originalFile: filename,
+      fileSize: 0, error: `Graph API error: ${(err as Error).message}`, route: "graph-api",
+    };
+  }
+}
+
+// ─── Mac SSH conversion ─────────────────────────────────────
+
 export async function convertViaMac(
   fileBuffer: Buffer,
   filename: string,
 ): Promise<ConvertResult> {
   const mac = getMacConfig();
-
-  if (!mac.host || !mac.user) {
-    return {
-      success: false,
-      pdfPath: "",
-      pdfBase64: "",
-      originalFile: filename,
-      fileSize: 0,
-      error: "Mac conversion server not configured. Set MAC_HOST and MAC_USER environment variables.",
-      route: "mac-office",
-    };
-  }
-
   await mkdir(TMP_DIR, { recursive: true });
 
   const jobId = randomUUID().slice(0, 8);
@@ -121,92 +247,69 @@ export async function convertViaMac(
   const sshTarget = `${mac.user}@${mac.host}`;
 
   try {
-    // Write input file locally
     await writeFile(localInput, fileBuffer);
-
-    // Ensure remote directory exists
     await execAsync(`ssh ${sshOpts} ${sshTarget} "mkdir -p ${mac.remoteDir}"`);
-
-    // SCP file to Mac
     await execAsync(`scp ${sshOpts} "${localInput}" "${sshTarget}:${remoteInput}"`);
 
-    // Execute conversion on Mac
     const { stdout: convertOut } = await execAsync(
       `ssh ${sshOpts} ${sshTarget} '${mac.scriptPath} "${remoteInput}"'`
     );
 
-    // Parse JSON result from convert.sh
     let macResult: { success: boolean; output: string; size?: number; error: string };
-    try {
-      macResult = JSON.parse(convertOut);
-    } catch {
-      return {
-        success: false,
-        pdfPath: "",
-        pdfBase64: "",
-        originalFile: filename,
-        fileSize: 0,
-        error: `Mac returned non-JSON output: ${convertOut}`,
-        route: "mac-office",
-      };
-    }
+    try { macResult = JSON.parse(convertOut); }
+    catch { return { success: false, pdfPath: "", pdfBase64: "", originalFile: filename, fileSize: 0, error: `Mac returned non-JSON: ${convertOut}`, route: "mac-office" }; }
 
     if (!macResult.success) {
-      return {
-        success: false,
-        pdfPath: "",
-        pdfBase64: "",
-        originalFile: filename,
-        fileSize: 0,
-        error: `Mac conversion failed: ${macResult.error}`,
-        route: "mac-office",
-      };
+      return { success: false, pdfPath: "", pdfBase64: "", originalFile: filename, fileSize: 0, error: `Mac conversion failed: ${macResult.error}`, route: "mac-office" };
     }
 
-    // SCP result PDF back
     await execAsync(`scp ${sshOpts} "${sshTarget}:${remoteOutput}" "${localOutput}"`);
-
-    // Read PDF
     const pdfBuffer = await readFile(localOutput);
 
-    return {
-      success: true,
-      pdfPath: localOutput,
-      pdfBase64: pdfBuffer.toString("base64"),
-      originalFile: filename,
-      fileSize: pdfBuffer.length,
-      error: "",
-      route: "mac-office",
-    };
+    return { success: true, pdfPath: localOutput, pdfBase64: pdfBuffer.toString("base64"), originalFile: filename, fileSize: pdfBuffer.length, error: "", route: "mac-office" };
   } catch (err) {
-    return {
-      success: false,
-      pdfPath: "",
-      pdfBase64: "",
-      originalFile: filename,
-      fileSize: 0,
-      error: `Mac conversion error: ${(err as Error).message}`,
-      route: "mac-office",
-    };
+    return { success: false, pdfPath: "", pdfBase64: "", originalFile: filename, fileSize: 0, error: `Mac error: ${(err as Error).message}`, route: "mac-office" };
   } finally {
-    // Cleanup local
-    try { await unlink(localInput); } catch { /* ok */ }
-    // Don't delete localOutput here - caller may need it for printing
-    // Cleanup remote
-    try {
-      await execAsync(
-        `ssh ${sshOpts} ${sshTarget} "rm -f '${remoteInput}' '${remoteOutput}'"`,
-        10_000
-      );
-    } catch { /* ok */ }
+    try { await unlink(localInput); } catch {}
+    try { await execAsync(`ssh ${sshOpts} ${sshTarget} "rm -f '${remoteInput}' '${remoteOutput}'"`, 10_000); } catch {}
   }
 }
 
-/**
- * Cleanup a local temp PDF after printing
- */
+// ─── Unified conversion (Mac → Graph API fallback) ──────────
+
+export async function convertOfficeFile(
+  fileBuffer: Buffer,
+  filename: string,
+): Promise<ConvertResult> {
+  // Priority 1: Mac (100% fidelity)
+  if (isMacConfigured()) {
+    const result = await convertViaMac(fileBuffer, filename);
+    if (result.success) return result;
+
+    // Mac failed → fall back to Graph API if available
+    if (isGraphConfigured()) {
+      console.error(`Mac conversion failed, falling back to Graph API: ${result.error}`);
+      return convertViaGraph(fileBuffer, filename);
+    }
+    return result;
+  }
+
+  // Priority 2: Graph API (~98-99% fidelity)
+  if (isGraphConfigured()) {
+    return convertViaGraph(fileBuffer, filename);
+  }
+
+  return {
+    success: false, pdfPath: "", pdfBase64: "", originalFile: filename, fileSize: 0,
+    error: "No Office converter configured. Set GRAPH_* or MAC_* environment variables.",
+    route: "none",
+  };
+}
+
+// ─── Cleanup ────────────────────────────────────────────────
+
 export async function cleanupTempPdf(pdfPath: string): Promise<void> {
   if (pdfPath && pdfPath.startsWith(TMP_DIR)) {
-    try { await unlink(pdfPath); } catch { /* ok */ }
+    try { await unlink(pdfPath); } catch {}
   }
 }

@@ -22,6 +22,7 @@ import {
 } from "../schemas/printer.js";
 import * as cups from "../services/cups.js";
 import * as converter from "../services/converter.js";
+// Use unified conversion: Mac (primary) → Graph API (fallback)
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -55,18 +56,18 @@ async function processAndPrint(
   let printBase64 = docBase64;
   let printFilename = filename;
 
-  // Convert Office files via Mac
+  // Convert Office files via Mac or Graph API
   if (route === "mac-office") {
-    if (!converter.isMacConfigured()) {
+    if (!converter.isOfficeConversionAvailable()) {
       return {
         success: false, jobId: "", printer: options.printer || "(default)",
-        message: "Office file detected but Mac conversion server is not configured. Set MAC_HOST and MAC_USER env vars. Only PDF/image/text can be printed directly.",
+        message: "Office file detected but no converter configured. Set GRAPH_* env vars (or MAC_HOST + MAC_USER for Mac). Only PDF/image/text can be printed directly.",
         commandOutput: "",
       };
     }
 
     const buf = Buffer.from(docBase64, "base64");
-    const result = await converter.convertViaMac(buf, filename);
+    const result = await converter.convertOfficeFile(buf, filename);
 
     if (!result.success) {
       return {
@@ -185,12 +186,12 @@ Use this to preview or verify a document before printing.`,
         if (route === "unsupported") {
           return err(`Unsupported format: ${params.filename}`);
         }
-        if (!converter.isMacConfigured()) {
-          return err("Mac conversion server not configured. Set MAC_HOST and MAC_USER env vars.");
+        if (!converter.isOfficeConversionAvailable()) {
+          return err("No Office converter configured. Set GRAPH_* env vars (or MAC_HOST + MAC_USER for Mac).");
         }
 
         const buf = Buffer.from(params.document_base64, "base64");
-        const result = await converter.convertViaMac(buf, params.filename);
+        const result = await converter.convertOfficeFile(buf, params.filename);
 
         if (result.pdfPath) await converter.cleanupTempPdf(result.pdfPath);
 
@@ -326,9 +327,7 @@ Use filter to narrow: 'staple', 'punch', 'fold', 'tray', 'media', 'booklet', 'in
     },
     async () => {
       const formats = converter.getSupportedFormats();
-      const macStatus = converter.isMacConfigured()
-        ? "✅ Mac conversion server configured"
-        : "❌ Mac conversion server NOT configured (set MAC_HOST, MAC_USER)";
+      const macStatus = converter.getConverterStatus();
       return ok({
         directPrint: { description: "Sent directly to CUPS (no conversion)", formats: formats.direct },
         macOfficeConvert: { description: "Converted to PDF via Mac Office (100% fidelity)", formats: formats.macOffice, status: macStatus },

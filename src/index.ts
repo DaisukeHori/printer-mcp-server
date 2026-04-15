@@ -5,6 +5,7 @@ import { SERVER_NAME, SERVER_VERSION, DEFAULT_PORT, MCP_PATH } from "./constants
 import { authMiddleware } from "./services/auth.js";
 import { registerPrinterTools } from "./tools/printer.js";
 import { isMacConfigured } from "./services/converter.js";
+import { getConverterStatus } from "./services/converter.js";
 
 function createServer(): McpServer {
   const server = new McpServer({
@@ -60,11 +61,7 @@ async function main(): Promise<void> {
     } else {
       console.error("API key authentication: DISABLED (set MCP_API_KEY to enable)");
     }
-    if (isMacConfigured()) {
-      console.error(`Mac converter: ENABLED (${process.env.MAC_USER}@${process.env.MAC_HOST})`);
-    } else {
-      console.error("Mac converter: DISABLED (set MAC_HOST + MAC_USER for Office conversion)");
-    }
+    console.error(`Office converter: ${getConverterStatus()}`);
   });
 }
 
