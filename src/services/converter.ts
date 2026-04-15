@@ -54,7 +54,24 @@ const DIRECT_PRINT_FORMATS = new Set([
 ]);
 
 const IMAGE_CONVERT_FORMATS = new Set([
+  // iPhone / Modern web
   ".heic", ".heif", ".avif", ".webp", ".svg", ".svgz",
+  // Adobe
+  ".psd", ".psb", ".ai",
+  // GIMP
+  ".xcf",
+  // Legacy image
+  ".tga", ".ico", ".cur", ".pcx",
+  // Camera RAW (via dcraw/ImageMagick)
+  ".dng", ".cr2", ".cr3", ".crw", ".nef", ".nrw", ".arw",
+  ".orf", ".raf", ".rw2", ".pef", ".mef", ".mrw",
+  ".srf", ".sr2", ".erf", ".kdc", ".raw", ".3fr", ".x3f",
+]);
+
+const DOCUMENT_CONVERT_FORMATS = new Set([
+  ".md", ".markdown",   // Markdown → pandoc → HTML → wkhtmltopdf → PDF
+  ".html", ".htm",      // HTML → wkhtmltopdf → PDF
+  ".dxf",               // AutoCAD 2D → ezdxf + matplotlib → PNG
 ]);
 
 const OFFICE_FORMATS = new Set([
@@ -63,20 +80,27 @@ const OFFICE_FORMATS = new Set([
   ".ppt", ".pptx", ".pptm", ".ppsx", ".pps", ".potx",
 ]);
 
-export type ConvertRoute = "direct" | "image-convert" | "mac-office" | "unsupported";
+export type ConvertRoute = "direct" | "image-convert" | "document-convert" | "mac-office" | "unsupported";
 
 export function detectRoute(filename: string): ConvertRoute {
   const ext = extname(filename).toLowerCase();
   if (DIRECT_PRINT_FORMATS.has(ext)) return "direct";
   if (IMAGE_CONVERT_FORMATS.has(ext)) return "image-convert";
+  if (DOCUMENT_CONVERT_FORMATS.has(ext)) return "document-convert";
   if (OFFICE_FORMATS.has(ext)) return "mac-office";
   return "unsupported";
 }
 
-export function getSupportedFormats(): { direct: string[]; imageConvert: string[]; macOffice: string[] } {
+export function getSupportedFormats(): {
+  direct: string[];
+  imageConvert: string[];
+  documentConvert: string[];
+  macOffice: string[];
+} {
   return {
     direct: [...DIRECT_PRINT_FORMATS].sort(),
     imageConvert: [...IMAGE_CONVERT_FORMATS].sort(),
+    documentConvert: [...DOCUMENT_CONVERT_FORMATS].sort(),
     macOffice: [...OFFICE_FORMATS].sort(),
   };
 }
@@ -146,6 +170,84 @@ export async function convertImageFile(
     return {
       success: false, pdfPath: "", pdfBase64: "", originalFile: filename,
       fileSize: 0, error: `Image conversion failed: ${(err as Error).message}`, route: "image-convert",
+    };
+  } finally {
+    try { await unlink(localInput); } catch {}
+  }
+}
+
+// ─── Document conversion (MD/HTML → PDF, DXF → PNG) ────────
+
+export async function convertDocumentFile(
+  fileBuffer: Buffer,
+  filename: string,
+): Promise<ConvertResult> {
+  await mkdir(TMP_DIR, { recursive: true });
+  const jobId = randomUUID().slice(0, 8);
+  const ext = extname(filename).toLowerCase();
+  const localInput = join(TMP_DIR, `${jobId}-${filename}`);
+
+  try {
+    await writeFile(localInput, fileBuffer);
+
+    if (ext === ".dxf") {
+      // DXF → PNG via ezdxf + matplotlib
+      const outputPng = join(TMP_DIR, `${jobId}-${basename(filename, ext)}.png`);
+      const pyScript = `
+import ezdxf, sys
+from ezdxf.addons.drawing import RenderContext, Frontend
+from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+try:
+    doc = ezdxf.readfile("${localInput}")
+except Exception:
+    doc = ezdxf.read(open("${localInput}", "rb"))
+msp = doc.modelspace()
+fig = plt.figure(figsize=(11.69, 8.27))
+ax = fig.add_axes([0, 0, 1, 1])
+ctx = RenderContext(doc)
+out = MatplotlibBackend(ax)
+Frontend(ctx, out).draw_layout(msp)
+fig.savefig("${outputPng}", dpi=200, bbox_inches='tight')
+plt.close(fig)
+print("OK")
+`;
+      await execAsync(`python3 -c '${pyScript.replace(/'/g, "'\"'\"'")}'`, 60_000);
+      const outputBuffer = await readFile(outputPng);
+      return {
+        success: true, pdfPath: outputPng,
+        pdfBase64: outputBuffer.toString("base64"),
+        originalFile: filename, fileSize: outputBuffer.length, error: "", route: "dxf-convert",
+      };
+    }
+
+    // MD / HTML → PDF via pandoc + wkhtmltopdf
+    const outputPdf = join(TMP_DIR, `${jobId}-${basename(filename, ext)}.pdf`);
+
+    if (ext === ".md" || ext === ".markdown") {
+      // MD → HTML → PDF (pandoc + wkhtmltopdf)
+      const intermediateHtml = join(TMP_DIR, `${jobId}-intermediate.html`);
+      await execAsync(`pandoc "${localInput}" -t html5 --standalone -o "${intermediateHtml}"`, 30_000);
+      await execAsync(`wkhtmltopdf --quiet --enable-local-file-access "${intermediateHtml}" "${outputPdf}"`, 60_000);
+      try { await unlink(intermediateHtml); } catch {}
+    } else {
+      // HTML → PDF (wkhtmltopdf)
+      await execAsync(`wkhtmltopdf --quiet --enable-local-file-access "${localInput}" "${outputPdf}"`, 60_000);
+    }
+
+    const pdfBuffer = await readFile(outputPdf);
+    return {
+      success: true, pdfPath: outputPdf,
+      pdfBase64: pdfBuffer.toString("base64"),
+      originalFile: filename, fileSize: pdfBuffer.length, error: "", route: "document-convert",
+    };
+  } catch (err) {
+    return {
+      success: false, pdfPath: "", pdfBase64: "", originalFile: filename,
+      fileSize: 0, error: `Document conversion failed: ${(err as Error).message}`, route: "document-convert",
     };
   } finally {
     try { await unlink(localInput); } catch {}

@@ -58,7 +58,7 @@ async function processAndPrint(
   let printBase64 = docBase64;
   let printFilename = filename;
 
-  // Convert image files (HEIC/HEIF/AVIF/WEBP/SVG) via ImageMagick
+  // Convert image files (HEIC/HEIF/AVIF/WEBP/SVG/PSD/AI/RAW/etc) via ImageMagick
   if (route === "image-convert") {
     const buf = Buffer.from(docBase64, "base64");
     const result = await converter.convertImageFile(buf, filename);
@@ -73,6 +73,28 @@ async function processAndPrint(
 
     printBase64 = result.pdfBase64;
     printFilename = filename.replace(/\.[^.]+$/, ".jpg");
+
+    if (result.pdfPath) {
+      await converter.cleanupTempPdf(result.pdfPath);
+    }
+  }
+
+  // Convert document files (MD/HTML → PDF, DXF → PNG) via pandoc/wkhtmltopdf/ezdxf
+  if (route === "document-convert") {
+    const buf = Buffer.from(docBase64, "base64");
+    const result = await converter.convertDocumentFile(buf, filename);
+
+    if (!result.success) {
+      return {
+        success: false, jobId: "", printer: options.printer || "(default)",
+        message: result.error,
+        commandOutput: "",
+      };
+    }
+
+    printBase64 = result.pdfBase64;
+    const isImage = filename.match(/\.dxf$/i);
+    printFilename = filename.replace(/\.[^.]+$/, isImage ? ".png" : ".pdf");
 
     if (result.pdfPath) {
       await converter.cleanupTempPdf(result.pdfPath);
@@ -270,8 +292,9 @@ Use filter to narrow: 'staple', 'punch', 'fold', 'tray', 'media', 'booklet', 'in
       const macStatus = converter.getConverterStatus();
       return ok({
         directPrint: { description: "Sent directly to CUPS (no conversion)", formats: formats.direct },
-        imageConvert: { description: "Converted to JPEG via ImageMagick (HEIC/HEIF/AVIF/WEBP/SVG)", formats: formats.imageConvert },
-        macOfficeConvert: { description: "Converted to PDF via Mac Office (100% fidelity)", formats: formats.macOffice, status: macStatus },
+        imageConvert: { description: "Converted to JPEG via ImageMagick (iPhone/Adobe/Camera RAW/etc)", formats: formats.imageConvert },
+        documentConvert: { description: "Converted to PDF/PNG via pandoc/wkhtmltopdf/ezdxf (Markdown/HTML/DXF)", formats: formats.documentConvert },
+        macOfficeConvert: { description: "Converted to PDF via Graph API (Office documents)", formats: formats.macOffice, status: macStatus },
       });
     }
   );
