@@ -72,10 +72,21 @@ export function listFiles(): UploadedFile[] {
   return Array.from(registry.values());
 }
 
-/** Clean up files older than MAX_AGE_MS */
+/**
+ * Clean up files older than MAX_AGE_MS
+ *
+ * registry は in-memory の Map なので、プロセス再起動で中身が失われる。
+ * registry だけを走査していると、再起動をまたいだファイルは削除対象から外れ、
+ * 孤児として残り続ける。UPLOAD_DIR が /tmp のうちは systemd-tmpfiles の
+ * 30 日クリーンアップが最後の防波堤になるが、/tmp 以外へ移すと無限に溜まる。
+ * そのため registry 走査に加えてディスクも走査し、registry に存在せず
+ * 更新時刻が MAX_AGE_MS を超えたファイルを回収する。
+ */
 export async function cleanupOldFiles(): Promise<number> {
   const now = Date.now();
   let cleaned = 0;
+
+  // 1. registry に載っているもの (通常経路)
   for (const [id, entry] of registry) {
     if (now - entry.uploaded_at > MAX_AGE_MS) {
       try { await unlink(entry.path); } catch { /* ignore */ }
@@ -83,5 +94,24 @@ export async function cleanupOldFiles(): Promise<number> {
       cleaned++;
     }
   }
+
+  // 2. registry から失われた孤児 (プロセス再起動をまたいだファイル)
+  const liveIds = new Set(registry.keys());
+  try {
+    const names = await readdir(UPLOAD_DIR);
+    for (const name of names) {
+      const fileId = name.replace(/\.[^.]+$/, "");
+      if (liveIds.has(fileId)) continue;
+      const full = join(UPLOAD_DIR, name);
+      try {
+        const s = await stat(full);
+        if (now - s.mtimeMs > MAX_AGE_MS) {
+          await unlink(full);
+          cleaned++;
+        }
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore — UPLOAD_DIR が無い場合など */ }
+
   return cleaned;
 }
