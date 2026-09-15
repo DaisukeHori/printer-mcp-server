@@ -100,6 +100,37 @@ function getInstalledOptions(): Record<string, string> {
   };
 }
 
+// ─── Known over-strict PPD constraints ──────────────────────
+// Linux 用 PPD は排紙先 FLDTRAY を Z折りユニット(Option24)依存として記述しているが、
+// 実機 (TASKalfa 6054ci + DF-7150 + 中折りユニット) では Option22=True のみで
+// FLDTRAY への排紙と三つ折りが正常に動作する。
+//
+// 2026-09-16 実機検証:
+//   A4 / 白黒 / 両面長辺とじ / 三つ折り / 印刷面を外側 / FLDTRAY 排紙 を
+//   60 件以上出力して全て正常。10 ページ (両面 5 枚) の 5 枚まとめ折りも成功。
+//   macOS 用 PPD では同じ制約が Option22 依存で記述されており、
+//   Linux 用 PPD 側の記述が実機の能力より厳しいと判断した。
+//
+// このリストに載せた組み合わせは制約違反として報告しない。
+const KNOWN_OVERSTRICT: { option: string; value: string }[][] = [
+  [
+    { option: "OutputBin", value: "FLDTRAY" },
+    { option: "Option24", value: "False" },
+  ],
+];
+
+function constraintKey(conditions: { option: string; value: string }[]): string {
+  return conditions
+    .map((c) => `${c.option}=${c.value}`)
+    .sort()
+    .join("|");
+}
+
+function isKnownOverstrict(conditions: { option: string; value: string }[]): boolean {
+  const target = constraintKey(conditions);
+  return KNOWN_OVERSTRICT.some((rule) => constraintKey(rule) === target);
+}
+
 // ─── Constraint checker ─────────────────────────────────────
 
 export async function checkConstraints(
@@ -165,8 +196,13 @@ export async function checkConstraints(
     return true;
   });
 
+  // PPD の記述が実機の能力より厳しい既知の組み合わせを除外する
+  const filteredViolations = dedupedViolations.filter(
+    (v) => !isKnownOverstrict(v.conflicting),
+  );
+
   return {
-    violations: dedupedViolations,
+    violations: filteredViolations,
     checkedConstraints: constraints.length,
     applicableConstraints: applicableCount,
   };

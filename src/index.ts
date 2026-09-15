@@ -11,7 +11,14 @@ import * as upload from "./services/upload.js";
 
 // ─── Multer setup ───────────────────────────────────────────
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, upload.getUploadDir()),
+  destination: (_req, _file, cb) => {
+    // 起動時の 1 回だけでは不十分。/tmp が掃除されるとディレクトリが消え、
+    // multer が書き込み先を失って 500 を返すため、毎回存在を保証する
+    upload
+      .ensureUploadDir()
+      .then(() => cb(null, upload.getUploadDir()))
+      .catch((err: unknown) => cb(err as Error, ""));
+  },
   filename: (_req, file, cb) => {
     const fileId = upload.generateFileId();
     // Preserve original extension
@@ -108,6 +115,25 @@ async function main(): Promise<void> {
   app.delete(MCP_PATH, (_req, res) => {
     res.writeHead(405).end(JSON.stringify({ error: "Method not allowed. Sessions are not supported." }));
   });
+
+  // ─── Error handler ────────────────────────────────────────
+  // Express のデフォルトハンドラは HTML を返すため、原因が追えない。
+  // JSON でエラー内容を返す
+  app.use(
+    (
+      err: Error,
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      console.error("Request error:", err);
+      if (res.headersSent) return;
+      res.status(500).json({
+        error: err?.message ?? "Internal Server Error",
+        hint: "アップロードで失敗する場合は UPLOAD_DIR の存在と書き込み権限を確認してください",
+      });
+    },
+  );
 
   const port = parseInt(process.env.PORT || String(DEFAULT_PORT), 10);
   app.listen(port, "0.0.0.0", () => {

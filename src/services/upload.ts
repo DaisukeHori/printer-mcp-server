@@ -2,7 +2,9 @@ import { randomBytes } from "node:crypto";
 import { mkdir, unlink, stat, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const UPLOAD_DIR = "/tmp/printer-mcp-uploads";
+// /tmp 配下は OS やコンテナの一時ファイル掃除で消えるため、
+// 永続化したい場合は UPLOAD_DIR 環境変数で別パスを指定する
+const UPLOAD_DIR = process.env.UPLOAD_DIR || "/tmp/printer-mcp-uploads";
 const MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 export interface UploadedFile {
