@@ -10,7 +10,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@types/multer": "^2.1.0",
     "express": "^4.21.2",
     "multer": "^2.1.1",
